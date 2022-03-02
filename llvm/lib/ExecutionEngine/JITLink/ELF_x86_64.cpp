@@ -379,7 +379,7 @@ void link_ELF_x86_64(std::unique_ptr<LinkGraph> G,
 
   if (Ctx->shouldAddDefaultTargetPasses(G->getTargetTriple())) {
 
-    Config.PrePrunePasses.push_back(EHFrameSplitter(".eh_frame"));
+    Config.PrePrunePasses.push_back(DWARFRecordSectionSplitter(".eh_frame"));
     Config.PrePrunePasses.push_back(
         EHFrameEdgeFixer(".eh_frame", x86_64::PointerSize, x86_64::Delta64,
                          x86_64::Delta32, x86_64::NegDelta32));
@@ -438,7 +438,7 @@ const char *getELFX86RelocationKindName(Edge::Kind R) {
 }
 
 LinkGraphPassFunction createEHFrameSplitterPass_ELF_x86_64() {
-  return EHFrameSplitter(".eh_frame");
+  return DWARFRecordSectionSplitter(".eh_frame");
 }
 
 LinkGraphPassFunction createEHFrameEdgeFixerPass_ELF_x86_64() {

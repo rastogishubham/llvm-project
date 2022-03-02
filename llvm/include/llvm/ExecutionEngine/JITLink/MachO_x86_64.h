@@ -42,6 +42,10 @@ void link_MachO_x86_64(std::unique_ptr<LinkGraph> G,
 /// objects.
 LinkGraphPassFunction createEHFrameSplitterPass_MachO_x86_64();
 
+/// Returns a pass suitable for splitting __debug_line sections in MachO/x86-64
+/// objects.
+LinkGraphPassFunction createDebugLineSplitterPass_MachO_x86_64();
+
 /// Returns a pass suitable for fixing missing edges in an __eh_frame section
 /// in a MachO/x86-64 object.
 LinkGraphPassFunction createEHFrameEdgeFixerPass_MachO_x86_64();

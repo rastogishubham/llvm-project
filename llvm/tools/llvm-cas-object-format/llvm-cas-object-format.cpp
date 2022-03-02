@@ -732,14 +732,15 @@ static void dumpGraph(jitlink::LinkGraph &G, SharedStream &OS, StringRef Desc) {
 /// removeRedundantEHFrameSymbol() removes this redundant symbol before we run
 /// the EH frame splitter.
 /// FIXME: Should this be taken care of by the EH frame splitter?
-static void removeRedundantEHFrameSymbol(jitlink::LinkGraph &G) {
+static void removeRedundantSectionSymbol(jitlink::LinkGraph &G,
+                                         StringRef SectionName) {
   // FIXME: Consider implementing removeRedundantEHFrameSymbol as a jitlink
   // pass. Note this section name is machO specific.
-  auto *EHFrame = G.findSectionByName("__TEXT,__eh_frame");
-  if (!EHFrame)
+  auto *Section = G.findSectionByName(SectionName);
+  if (!Section)
     return;
   for (jitlink::Symbol *Sym : G.defined_symbols()) {
-    if (&Sym->getBlock().getSection() == EHFrame) {
+    if (&Sym->getBlock().getSection() == Section) {
       G.removeDefinedSymbol(*Sym);
       break;
     }
@@ -749,7 +750,7 @@ static void removeRedundantEHFrameSymbol(jitlink::LinkGraph &G) {
 static Error createSplitEHFramePasses(jitlink::LinkGraph &G) {
   if (G.getTargetTriple().getObjectFormat() == Triple::MachO &&
       G.getTargetTriple().getArch() == Triple::x86_64) {
-    removeRedundantEHFrameSymbol(G);
+    removeRedundantSectionSymbol(G, "__TEXT,__eh_frame");
     if (auto E = jitlink::createEHFrameSplitterPass_MachO_x86_64()(G))
       return E;
     if (auto E = jitlink::createEHFrameEdgeFixerPass_MachO_x86_64()(G))
@@ -764,6 +765,16 @@ static Error createSplitEHFramePasses(jitlink::LinkGraph &G) {
   } else
     dbgs() << "Note: not fixing eh-frame sections\n";
 
+  return Error::success();
+}
+
+static Error createSplitDebugLinePassess(jitlink::LinkGraph &G) {
+  if (G.getTargetTriple().getObjectFormat() == Triple::MachO &&
+      G.getTargetTriple().getArch() == Triple::x86_64) {
+    removeRedundantSectionSymbol(G, "__DWARF,__debug_line");
+    if (auto E = jitlink::createDebugLineSplitterPass_MachO_x86_64()(G))
+      return E;
+  }
   return Error::success();
 }
 
@@ -788,6 +799,9 @@ static CASID ingestFile(SchemaBase &Schema, StringRef InputFile,
 
     if (SplitEHFrames)
       ExitOnErr(createSplitEHFramePasses(*G));
+    
+    ExitOnErr(createSplitDebugLinePassess(*G));
+            
     return G;
   };
 
