@@ -61,6 +61,14 @@ Error DWARFRecordSectionSplitter::operator()(LinkGraph &G) {
       return Err;
   }
 
+  // If the debug_line section is being split, add an anonymous symbol so that
+  // the blocks don't get dropped
+  if (SectionName == "__DWARF,__debug_line") {
+    for (auto *B : Section->blocks()) {
+      G.addAnonymousSymbol(*B, 0, B->getSize(), false, true);
+    }
+  }
+
   return Error::success();
 }
 
@@ -106,20 +114,12 @@ Error DWARFRecordSectionSplitter::processBlock(
 
     // If this was the last block then there's nothing to split
     if (BlockReader.empty()) {
-      // If the debug_line section is being split, add an anonymous symbol so
-      // that the blocks don't get dropped.
-      if (!SectionName.compare("__DWARF,__debug_line"))
-        G.addAnonymousSymbol(B, 0, B.getContent().size(), false, true);
       LLVM_DEBUG(dbgs() << "      Extracted " << B << "\n");
       return Error::success();
     }
 
     uint64_t BlockSize = BlockReader.getOffset() - RecordStartOffset;
     auto &NewBlock = G.splitBlock(B, BlockSize);
-    // If the debug_line section is being split, add an anonymous symbol so that
-    // the blocks don't get dropped
-    if (!SectionName.compare("__DWARF,__debug_line"))
-      G.addAnonymousSymbol(NewBlock, 0, BlockSize, false, true);
     (void)NewBlock;
     LLVM_DEBUG(dbgs() << "      Extracted " << NewBlock << "\n");
   }
