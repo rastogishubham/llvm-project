@@ -61,14 +61,6 @@ Error DWARFRecordSectionSplitter::operator()(LinkGraph &G) {
       return Err;
   }
 
-  // If the debug_line section is being split, add an anonymous symbol so that
-  // the blocks don't get dropped
-  if (SectionName == "__DWARF,__debug_line") {
-    for (auto *B : Section->blocks()) {
-      G.addAnonymousSymbol(*B, 0, B->getSize(), false, true);
-    }
-  }
-
   return Error::success();
 }
 

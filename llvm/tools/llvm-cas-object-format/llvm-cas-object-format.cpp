@@ -774,6 +774,13 @@ static Error createSplitDebugLinePassess(jitlink::LinkGraph &G) {
     removeRedundantSectionSymbol(G, "__DWARF,__debug_line");
     if (auto E = jitlink::createDebugLineSplitterPass_MachO_x86_64()(G))
       return E;
+    // Add an anonymous symbol so that the blocks don't get dropped
+    if (auto *DLSec = G.findSectionByName("__DWARF,__debug_line")) {
+      for (auto *B : DLSec->blocks()) {
+        G.addAnonymousSymbol(*B, 0, B->getSize(), false, true);
+      }
+    }
+    
   }
   return Error::success();
 }

@@ -22,7 +22,7 @@ namespace llvm {
 namespace jitlink {
 
 /// A LinkGraph pass that splits blocks in a section that follows the DWARF
-/// Record format into sub-blocks where each header gets it's own block.
+/// Record format into sub-blocks where each header gets its own block.
 /// When splitting EHFrames, DWARFRecordSectionSplitter should not be run
 /// without EHFrameEdgeFixer, which is responsible for adding FDE-to-CIE edges.
 class DWARFRecordSectionSplitter {
