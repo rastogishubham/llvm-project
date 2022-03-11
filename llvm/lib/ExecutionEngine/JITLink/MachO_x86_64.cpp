@@ -507,7 +507,7 @@ LinkGraphPassFunction createEHFrameSplitterPass_MachO_x86_64() {
   return DWARFRecordSectionSplitter("__TEXT,__eh_frame");
 }
 
-LinkGraphPassFunction createDebugLineSplitterPass_MachO_x86_64() {
+LinkGraphPassFunction createDebugLineSplitterPass_MachO() {
   return DWARFRecordSectionSplitter("__DWARF,__debug_line");
 }
 

@@ -768,11 +768,10 @@ static Error createSplitEHFramePasses(jitlink::LinkGraph &G) {
   return Error::success();
 }
 
-static Error createSplitDebugLinePassess(jitlink::LinkGraph &G) {
-  if (G.getTargetTriple().getObjectFormat() == Triple::MachO &&
-      G.getTargetTriple().getArch() == Triple::x86_64) {
+static Error SplitDebugLine(jitlink::LinkGraph &G) {
+  if (G.getTargetTriple().getObjectFormat() == Triple::MachO) {
     removeRedundantSectionSymbol(G, "__DWARF,__debug_line");
-    if (auto E = jitlink::createDebugLineSplitterPass_MachO_x86_64()(G))
+    if (auto E = jitlink::createDebugLineSplitterPass_MachO()(G))
       return E;
     // Add an anonymous symbol so that the blocks don't get dropped
     if (auto *DLSec = G.findSectionByName("__DWARF,__debug_line")) {
@@ -807,7 +806,7 @@ static CASID ingestFile(SchemaBase &Schema, StringRef InputFile,
     if (SplitEHFrames)
       ExitOnErr(createSplitEHFramePasses(*G));
     
-    ExitOnErr(createSplitDebugLinePassess(*G));
+    ExitOnErr(SplitDebugLine(*G));
             
     return G;
   };
