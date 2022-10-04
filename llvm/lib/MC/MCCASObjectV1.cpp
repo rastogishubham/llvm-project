@@ -67,6 +67,10 @@ cl::opt<RelEncodeLoc> RelocLocation(
                clEnumVal(CompileUnit, "In compile unit")),
     cl::init(Atom));
 
+DenseMap<unsigned, cas::ObjectRef>
+    MCCASBuilder::DebugStringSectionContents::MapOfStringRefs =
+        DenseMap<unsigned, cas::ObjectRef>();
+
 struct CUInfo {
   size_t CUSize;
   uint32_t AbbrevOffset;
@@ -1632,14 +1636,16 @@ Error MCCASBuilder::createPaddingRef(const MCSection *Sec) {
 }
 
 Error MCCASBuilder::createStringSection(
-    StringRef S, std::function<Error(StringRef)> CreateFn) {
+    StringRef S, std::function<Error(StringRef, unsigned)> CreateFn) {
   assert(S.endswith("\0") && "String sections are null terminated");
+  unsigned DebugStringOffset = 0;
   if (!SplitStringSections)
-    return CreateFn(S);
+    return CreateFn(S, DebugStringOffset);
 
   while (!S.empty()) {
     auto SplitSym = S.split('\0');
-    if (auto E = CreateFn(SplitSym.first))
+    DebugStringOffset += SplitSym.first.size() + 1;
+    if (auto E = CreateFn(SplitSym.first, DebugStringOffset))
       return E;
 
     S = SplitSym.second;
@@ -1950,7 +1956,8 @@ InMemoryCASDWARFObject::splitUpCUData(ArrayRef<char> DebugInfoData,
   return SplitData;
 }
 
-Expected<AbbrevAndDebugSplit> MCCASBuilder::splitDebugInfoAndAbbrevSections() {
+Expected<AbbrevAndDebugSplit> MCCASBuilder::splitDebugInfoAndAbbrevSections(
+    ArrayRef<DebugStrRef> DebugStringRefs) {
   if (!DwarfSections.DebugInfo)
     return AbbrevAndDebugSplit{};
 
@@ -2050,24 +2057,12 @@ Error MCCASBuilder::createLineSection() {
   return finalizeSection();
 }
 
-Error MCCASBuilder::createDebugStrSection() {
-  assert(DwarfSections.Str->getFragmentList().size() == 1 &&
-         "One fragment in debug str section");
+Error MCCASBuilder::createDebugStrSection(
+    ArrayRef<DebugStrRef> DebugStringRefs) {
 
   startSection(DwarfSections.Str);
-
-  ArrayRef<char> DebugStrData =
-      cast<MCDataFragment>(*DwarfSections.Str->begin()).getContents();
-  StringRef S(DebugStrData.data(), DebugStrData.size());
-  if (auto E = createStringSection(S, [&](StringRef S) -> Error {
-        auto Sym = DebugStrRef::create(*this, S);
-        if (!Sym)
-          return Sym.takeError();
-        addNode(*Sym);
-        return Error::success();
-      }))
-    return E;
-
+  for (auto DebugStringRef : DebugStringRefs)
+    addNode(DebugStringRef);
   return finalizeSection();
 }
 
@@ -2084,11 +2079,41 @@ static void createAddendVector(
          Addend.Size});
 }
 
+Expected<MCCASBuilder::DebugStringSectionContents>
+MCCASBuilder::createDebugStringRefs() {
+  if (!DwarfSections.Str || !DwarfSections.Str->getFragmentList().size())
+    return DebugStringSectionContents{};
+
+  assert(DwarfSections.Str->getFragmentList().size() == 1 &&
+         "One fragment in debug str section");
+
+  DebugStringSectionContents DebugStringContents;
+  ArrayRef<char> DebugStrData =
+      cast<MCDataFragment>(*DwarfSections.Str->begin()).getContents();
+  StringRef S(DebugStrData.data(), DebugStrData.size());
+  if (auto E = createStringSection(
+          S, [&](StringRef S, unsigned DebugStringOffset) -> Error {
+            auto Sym = DebugStrRef::create(*this, S);
+            if (!Sym)
+              return Sym.takeError();
+            DebugStringContents.DebugStringRefs.push_back(*Sym);
+            DebugStringSectionContents::MapOfStringRefs.try_emplace(
+                DebugStringOffset, Sym->getRef());
+            return Error::success();
+          }))
+    return E;
+  return DebugStringContents;
+}
+
 Error MCCASBuilder::buildFragments() {
   startGroup();
 
+  auto DebugStringContents = createDebugStringRefs();
+  if (!DebugStringContents)
+    return DebugStringContents.takeError();
+
   Expected<AbbrevAndDebugSplit> AbbrevAndCURefs =
-      splitDebugInfoAndAbbrevSections();
+      splitDebugInfoAndAbbrevSections(DebugStringContents->DebugStringRefs);
   if (!AbbrevAndCURefs)
     return AbbrevAndCURefs.takeError();
 
@@ -2121,7 +2146,7 @@ Error MCCASBuilder::buildFragments() {
 
     // Handle Debug Str sections separately.
     if (&Sec == DwarfSections.Str) {
-      if (auto E = createDebugStrSection())
+      if (auto E = createDebugStrSection(DebugStringContents->DebugStringRefs))
         return E;
       continue;
     }
@@ -2201,13 +2226,14 @@ Error MCCASBuilder::buildSymbolTable() {
   ObjectWriter.writeSymbolTable(Asm, Layout);
   StringRef S = ObjectWriter.getContent();
   std::vector<cas::ObjectRef> CStrings;
-  if (auto E = createStringSection(S, [&](StringRef S) -> Error {
-        auto Sym = CStringRef::create(*this, S);
-        if (!Sym)
-          return Sym.takeError();
-        CStrings.push_back(Sym->getRef());
-        return Error::success();
-      }))
+  if (auto E = createStringSection(
+          S, [&](StringRef S, unsigned DebugStringOffset) -> Error {
+            auto Sym = CStringRef::create(*this, S);
+            if (!Sym)
+              return Sym.takeError();
+            CStrings.push_back(Sym->getRef());
+            return Error::success();
+          }))
     return E;
 
   auto Ref = SymbolTableRef::create(*this, CStrings);
