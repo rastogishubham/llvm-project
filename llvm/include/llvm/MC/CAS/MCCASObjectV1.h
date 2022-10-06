@@ -328,6 +328,34 @@ private:
   MCAssemblerRef(SpecificRefT Ref) : SpecificRefT(Ref) {}
 };
 
+class DebugInfoCURef : public SpecificRef<DebugInfoCURef> {
+  using SpecificRefT = SpecificRef<DebugInfoCURef>;
+  friend class SpecificRef<DebugInfoCURef>;
+
+public:
+  static constexpr StringLiteral KindString = "debug_info_cu";
+  static Expected<DebugInfoCURef> create(MCCASBuilder &MB, StringRef Data,
+                                         ArrayRef<cas::ObjectRef> Refs);
+  static Expected<DebugInfoCURef> get(Expected<MCObjectProxy> Ref);
+  static Expected<DebugInfoCURef> get(const MCSchema &Schema,
+                                      cas::ObjectRef ID) {
+    return get(Schema.get(ID));
+  }
+  static Optional<DebugInfoCURef> Cast(MCObjectProxy Ref) {
+    auto Specific = SpecificRefT::Cast(Ref);
+    if (!Specific)
+      return None;
+    return DebugInfoCURef(*Specific);
+  }
+  Expected<uint64_t> materialize(raw_ostream &OS) const {
+    OS << getData();
+    return getData().size();
+  }
+
+private:
+  explicit DebugInfoCURef(SpecificRefT Ref) : SpecificRefT(Ref) {}
+};
+
 struct DwarfSectionsCache {
   MCSection *DebugInfo;
   MCSection *Line;
@@ -423,6 +451,15 @@ public:
     return AtomAddends;
   }
 
+  Optional<cas::ObjectRef>
+  getObjectRefFromStringMap(unsigned StringOffset) const {
+    auto StringRefIt =
+        DebugStringSectionContents::MapOfStringRefs.find(StringOffset);
+    if (StringRefIt != DebugStringSectionContents::MapOfStringRefs.end())
+      return StringRefIt->getSecond();
+    return None;
+  }
+
   // Scratch space
   SmallString<8> FragmentData;
   raw_svector_ostream FragmentOS;
@@ -471,7 +508,7 @@ private:
                      ArrayRef<char> FullAbbrevData);
 
   struct DebugStringSectionContents {
-    SmallVector<DebugStrRef> DebugStringRefs;
+    SmallVector<DebugStrRef, 0> DebugStringRefs;
     static DenseMap<unsigned, cas::ObjectRef> MapOfStringRefs;
   };
 
@@ -569,6 +606,7 @@ public:
   struct PartitionedDebugInfoSection {
     SmallVector<char, 0> DebugInfoCURefData;
     SmallVector<char, 0> DistinctData;
+    SmallVector<cas::ObjectRef, 0> DebugStringRefs;
     constexpr static std::array FormsToPartition{
         llvm::dwarf::Form::DW_FORM_strp, llvm::dwarf::Form::DW_FORM_sec_offset};
   };
@@ -580,8 +618,9 @@ public:
   /// deduplicate. Store both kinds of Forms in their own buffers per compile
   /// unit.
   Expected<PartitionedDebugInfoSection>
-  splitUpCUData(ArrayRef<char> DebugInfoData, uint64_t AbbrevOffset,
-                uint64_t CUOffset, DWARFContext *Ctx);
+  splitUpCUData(MCCASBuilder &Builder, ArrayRef<char> DebugInfoData,
+                uint64_t AbbrevOffset, uint64_t CUOffset, DWARFContext *Ctx,
+                ArrayRef<DebugStrRef> DebugStringRefs);
 };
 
 class DebugInfoSectionRef : public SpecificRef<DebugInfoSectionRef> {

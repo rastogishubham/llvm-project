@@ -41,6 +41,7 @@ constexpr StringLiteral PaddingRef::KindString;
   constexpr StringLiteral MCFragmentName##Ref::KindString;
 #include "llvm/MC/CAS/MCCASObjectV1.def"
 constexpr StringLiteral DebugInfoSectionRef::KindString;
+constexpr StringLiteral DebugInfoCURef::KindString;
 
 constexpr unsigned Dwarf4HeaderSize32Bit = 11;
 
@@ -127,6 +128,7 @@ Error MCSchema::fillCache() {
       PaddingRef::KindString,
       MCAssemblerRef::KindString,
       DebugInfoSectionRef::KindString,
+      DebugInfoCURef::KindString,
 #define CASV1_SIMPLE_DATA_REF(RefName, IdentifierName) RefName::KindString,
 #define CASV1_SIMPLE_GROUP_REF(RefName, IdentifierName) RefName::KindString,
 #define MCFRAGMENT_NODE_REF(MCFragmentName, MCEnumName, MCEnumIdentifier)      \
@@ -394,6 +396,27 @@ decodeReferences(const MCObjectProxy &Node, StringRef &Remaining) {
   }
 
   return CompactRefs;
+}
+
+Expected<DebugInfoCURef> DebugInfoCURef::create(MCCASBuilder &MB,
+                                                StringRef Name,
+                                                ArrayRef<cas::ObjectRef> Refs) {
+  auto B = Builder::startNode(MB.Schema, KindString);
+  if (!B)
+    return B.takeError();
+
+  if (auto E = encodeReferences(Refs, B->Data, B->Refs))
+    return std::move(E);
+
+  B->Data.append(Name);
+  return get(B->build());
+}
+
+Expected<DebugInfoCURef> DebugInfoCURef::get(Expected<MCObjectProxy> Ref) {
+  auto Specific = SpecificRefT::getSpecific(std::move(Ref));
+  if (!Specific)
+    return Specific.takeError();
+  return DebugInfoCURef(*Specific);
 }
 
 Expected<GroupRef> GroupRef::create(MCCASBuilder &MB,
@@ -1860,9 +1883,11 @@ DebugAbbrevOffsetsRefAdaptor::encodeOffsets(ArrayRef<size_t> Offsets) {
 }
 
 static void
-partitionCUDie(InMemoryCASDWARFObject::PartitionedDebugInfoSection &SplitData,
+partitionCUDie(MCCASBuilder &Builder,
+               InMemoryCASDWARFObject::PartitionedDebugInfoSection &SplitData,
                DWARFDie &CUDie, ArrayRef<char> DebugInfoData,
-               uint64_t &CUOffset, bool IsLittleEndian, uint8_t AddressSize) {
+               uint64_t &CUOffset, bool IsLittleEndian, uint8_t AddressSize,
+               bool IsFirstStrp) {
 
   // Copy Abbrev Tag
   DWARFDataExtractor DWARFExtractor(toStringRef(DebugInfoData), IsLittleEndian,
@@ -1875,10 +1900,22 @@ partitionCUDie(InMemoryCASDWARFObject::PartitionedDebugInfoSection &SplitData,
   for (const DWARFAttribute &AttrValue : CUDie.attributes()) {
     if (is_contained(InMemoryCASDWARFObject::PartitionedDebugInfoSection::
                          FormsToPartition,
-                     AttrValue.Value.getForm()))
+                     AttrValue.Value.getForm()) &&
+        IsFirstStrp) {
       append_range(SplitData.DistinctData,
                    DebugInfoData.slice(AttrValue.Offset, AttrValue.ByteSize));
-    else
+      if (AttrValue.Value.getForm() == llvm::dwarf::DW_FORM_strp)
+        IsFirstStrp = false;
+    } else if (!IsFirstStrp &&
+               AttrValue.Value.getForm() == llvm::dwarf::DW_FORM_strp) {
+      // TODO: Add support for 64-bit DWARF
+      uint32_t StringOffset;
+      memcpy(&StringOffset, &DebugInfoData[AttrValue.Offset], 4);
+      auto StringRef = Builder.getObjectRefFromStringMap(StringOffset);
+      if (!StringRef)
+        llvm_unreachable("Strp value not found in debug string section!");
+      SplitData.DebugStringRefs.push_back(*StringRef);
+    } else
       append_range(SplitData.DebugInfoCURefData,
                    DebugInfoData.slice(AttrValue.Offset, AttrValue.ByteSize));
     CUOffset += AttrValue.ByteSize;
@@ -1886,8 +1923,8 @@ partitionCUDie(InMemoryCASDWARFObject::PartitionedDebugInfoSection &SplitData,
 
   DWARFDie Child = CUDie.getFirstChild();
   while (Child && Child.getAbbreviationDeclarationPtr()) {
-    partitionCUDie(SplitData, Child, DebugInfoData, CUOffset, IsLittleEndian,
-                   AddressSize);
+    partitionCUDie(Builder, SplitData, Child, DebugInfoData, CUOffset,
+                   IsLittleEndian, AddressSize, IsFirstStrp);
     Child = Child.getSibling();
   }
   if (Child && !Child.getAbbreviationDeclarationPtr()) {
@@ -1897,9 +1934,11 @@ partitionCUDie(InMemoryCASDWARFObject::PartitionedDebugInfoSection &SplitData,
 }
 
 Expected<InMemoryCASDWARFObject::PartitionedDebugInfoSection>
-InMemoryCASDWARFObject::splitUpCUData(ArrayRef<char> DebugInfoData,
+InMemoryCASDWARFObject::splitUpCUData(MCCASBuilder &Builder,
+                                      ArrayRef<char> DebugInfoData,
                                       uint64_t AbbrevOffset, uint64_t CUOffset,
-                                      DWARFContext *Ctx) {
+                                      DWARFContext *Ctx,
+                                      ArrayRef<DebugStrRef> DebugStringRefs) {
 
   StringRef AbbrevSectionContribution =
       getAbbrevSection().drop_front(AbbrevOffset);
@@ -1950,8 +1989,8 @@ InMemoryCASDWARFObject::splitUpCUData(ArrayRef<char> DebugInfoData,
     if (!C)
       return C.takeError();
 
-    partitionCUDie(SplitData, CUDie, DebugInfoData, CUOffset, IsLittleEndian,
-                   DCU.getAddressByteSize());
+    partitionCUDie(Builder, SplitData, CUDie, DebugInfoData, CUOffset,
+                   IsLittleEndian, DCU.getAddressByteSize(), true);
   }
   return SplitData;
 }
@@ -1996,14 +2035,15 @@ Expected<AbbrevAndDebugSplit> MCCASBuilder::splitDebugInfoAndAbbrevSections(
   for (auto [CUData, AbbrevOffset] :
        llvm::zip(SplitInfo->SplitCUData, SplitInfo->AbbrevOffsets)) {
     uint64_t CUOffset = 0;
-    auto SplitData =
-        CASObj.splitUpCUData(CUData, AbbrevOffset, CUOffset, DWARFCtx);
+    auto SplitData = CASObj.splitUpCUData(*this, CUData, AbbrevOffset, CUOffset,
+                                          DWARFCtx, DebugStringRefs);
     if (!SplitData)
       return SplitData.takeError();
     DistinctData.append(SplitData->DistinctData.begin(),
                         SplitData->DistinctData.end());
     auto DbgInfoRef = DebugInfoCURef::create(
-        *this, toStringRef(SplitData->DebugInfoCURefData));
+        *this, toStringRef(SplitData->DebugInfoCURefData),
+        SplitData->DebugStringRefs);
     if (!DbgInfoRef)
       return DbgInfoRef.takeError();
     CURefs.push_back(*DbgInfoRef);
