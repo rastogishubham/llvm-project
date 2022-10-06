@@ -647,9 +647,10 @@ public:
       return None;
     return DebugInfoSectionRef(*Specific);
   }
-  Expected<uint64_t> materialize(MCCASReader &Reader,
-                                 ArrayRef<char> AbbrevSectionContents,
-                                 raw_ostream *Stream = nullptr) const;
+  Expected<uint64_t>
+  materialize(MCCASReader &Reader, ArrayRef<char> AbbrevSectionContents,
+              DenseMap<cas::ObjectRef, unsigned> MapOfStringOffsets,
+              raw_ostream *Stream = nullptr) const;
 
 private:
   explicit DebugInfoSectionRef(SpecificRefT Ref) : SpecificRefT(Ref) {}

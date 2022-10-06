@@ -485,13 +485,62 @@ LoadedDebugAbbrevSection::load(DebugAbbrevSectionRef Section) {
   return LoadedSection;
 }
 
-Expected<DebugAbbrevSectionRef>
-findDebugAbbrevSectionRef(MCCASReader &Reader, ArrayRef<cas::ObjectRef> Refs) {
+/// Struct that represents a fully verified DebugStringSectionRef object loaded
+/// from the CAS.
+struct LoadedDebugStringSection {
+  DenseMap<cas::ObjectRef, unsigned> MapOfStringOffsets;
+
+  static Expected<LoadedDebugStringSection> load(DebugStringSectionRef Section);
+
+private:
+  /// Extracts the information contained in \p Proxy, which must be either an
+  /// StrRef or a PaddingNode.
+  Error addNode(Expected<MCObjectProxy> Proxy, unsigned &StringOffset) {
+    if (!Proxy)
+      return Proxy.takeError();
+    if (auto StrRef = DebugStrRef::Cast(*Proxy)) {
+      MapOfStringOffsets.try_emplace(StrRef->getRef(), StringOffset);
+      StringOffset += StrRef->getData().size() + 1;
+    } else
+      return createStringError(inconvertibleErrorCode(),
+                               "Invalid node for Debug Info section");
+    return Error::success();
+  }
+};
+
+Expected<LoadedDebugStringSection>
+LoadedDebugStringSection::load(DebugStringSectionRef Section) {
+
+  StringRef Remaining = Section.getData();
+  auto Refs = decodeReferences(Section, Remaining);
+  if (!Refs)
+    return Refs.takeError();
+
+  const MCSchema &Schema = Section.getSchema();
+  cas::ObjectStore &CAS = Schema.CAS;
+  auto loadRef = [&](cas::ObjectRef Ref) {
+    return MCObjectProxy::get(Schema, CAS.getProxy(Ref));
+  };
+
+  LoadedDebugStringSection LoadedSection;
+  // TODO: Add support for 64 bit dwarf format
+  unsigned StringOffset = 0;
+  for (auto Ref : *Refs) {
+    if (auto E = LoadedSection.addNode(loadRef(Ref), StringOffset))
+      return std::move(E);
+  }
+
+  return LoadedSection;
+}
+
+template <typename SectionTy>
+Expected<SectionTy> findSectionRef(MCCASReader &Reader,
+                                   ArrayRef<cas::ObjectRef> Refs) {
   for (auto ID : Refs) {
     auto Node = Reader.getObjectProxy(ID);
     if (!Node)
       return Node.takeError();
-    if (auto DbgAbbrevSecRef = DebugAbbrevSectionRef::Cast(*Node))
+    if (auto DbgAbbrevSecRef = SectionTy::Cast(*Node))
       return *DbgAbbrevSecRef;
   }
   return createStringError(inconvertibleErrorCode(),
@@ -505,15 +554,22 @@ findDebugAbbrevSectionRef(MCCASReader &Reader, ArrayRef<cas::ObjectRef> Refs) {
 static Expected<uint64_t>
 materializeDebugInfoSection(MCCASReader &Reader, ArrayRef<cas::ObjectRef> Refs,
                             DebugInfoSectionRef &DebugInfoRef) {
-  auto AbbrevSectionRef = findDebugAbbrevSectionRef(Reader, Refs);
+  auto AbbrevSectionRef = findSectionRef<DebugAbbrevSectionRef>(Reader, Refs);
   if (!AbbrevSectionRef)
     return AbbrevSectionRef.takeError();
   auto LoadedAbbrev = LoadedDebugAbbrevSection::load(*AbbrevSectionRef);
   if (!LoadedAbbrev)
     return LoadedAbbrev.takeError();
 
+  auto StringSectionRef = findSectionRef<DebugStringSectionRef>(Reader, Refs);
+  if (!StringSectionRef)
+    return StringSectionRef.takeError();
+  auto LoadedString = LoadedDebugStringSection::load(*StringSectionRef);
+  if (!LoadedString)
+    return LoadedString.takeError();
+
   return DebugInfoRef.materialize(Reader, LoadedAbbrev->AbbrevContents,
-                                  &Reader.OS);
+                                  LoadedString->MapOfStringOffsets, &Reader.OS);
 }
 
 Expected<uint64_t> GroupRef::materialize(MCCASReader &Reader,
@@ -622,11 +678,27 @@ DebugAbbrevSectionRef::create(MCCASBuilder &MB,
   return get(B->build());
 }
 
+Expected<DebugStringSectionRef>
+DebugStringSectionRef::create(MCCASBuilder &MB,
+                              ArrayRef<cas::ObjectRef> Fragments) {
+  Expected<Builder> B = Builder::startNode(MB.Schema, KindString);
+  if (!B)
+    return B.takeError();
+
+  if (auto E = encodeReferences(Fragments, B->Data, B->Refs))
+    return std::move(E);
+
+  writeRelocationsAndAddends(MB.getSectionRelocs(), MB.getSectionAddends(),
+                             B->Data);
+  return get(B->build());
+}
+
 /// Class that represents a fully verified DebugInfoSectionRef object loaded
 /// from the CAS.
 struct LoadedDebugInfoSection {
   StringRef DistinctData;
   SmallVector<size_t, 0> AbbrevOffsets;
+  SmallVector<SmallVector<cas::ObjectRef>> DebugStringRefs;
   SmallVector<StringRef, 0> CUData;
   Optional<PaddingRef> Padding;
   StringRef RelocationData;
@@ -673,7 +745,14 @@ private:
       if (Padding.has_value())
         return createStringError(inconvertibleErrorCode(),
                                  "Invalid CURef after PaddingRef");
-      CUData.push_back(CURef->getData());
+
+      StringRef Remaining = CURef->getData();
+      auto DebugStrRefs = decodeReferences(*Proxy, Remaining);
+      if (!DebugStrRefs)
+        return DebugStrRefs.takeError();
+      DebugStringRefs.resize(DebugStringRefs.size() + 1);
+      DebugStringRefs.back().append(*DebugStrRefs);
+      CUData.push_back(Remaining);
     } else if (auto PaddingNode = PaddingRef::Cast(*Proxy)) {
       if (Padding.has_value())
         return createStringError(inconvertibleErrorCode(),
@@ -895,12 +974,14 @@ static Expected<uint64_t> getFormSize(dwarf::Form FormVal, dwarf::FormParams FP,
   return FormSize;
 }
 
-static Error materializeCUDie(DWARFCompileUnit &DCU,
-                              MutableArrayRef<char> SectionContents,
-                              StringRef CUData,
-                              ArrayRef<char> DistinctDataArrayRef,
-                              uint64_t &CUOffset, uint64_t &DistinctDataOffset,
-                              uint64_t &SectionOffset) {
+static Error
+materializeCUDie(DWARFCompileUnit &DCU, MutableArrayRef<char> SectionContents,
+                 StringRef CUData, ArrayRef<char> DistinctDataArrayRef,
+                 DenseMap<cas::ObjectRef, unsigned> MapOfStringOffsets,
+                 ArrayRef<cas::ObjectRef> DebugStringRefsVec,
+                 uint64_t &CUOffset, uint64_t &DistinctDataOffset,
+                 uint64_t &SectionOffset, bool &IsFirstStrp,
+                 unsigned &DebugStringIndex) {
   // Copy Abbrev Tag.
   DWARFDataExtractor DWARFExtractor(CUData, DCU.isLittleEndian(),
                                     DCU.getAddressByteSize());
@@ -938,7 +1019,8 @@ static Error materializeCUDie(DWARFCompileUnit &DCU,
     bool DidOverflow = false;
     if (is_contained(InMemoryCASDWARFObject::PartitionedDebugInfoSection::
                          FormsToPartition,
-                     Form)) {
+                     Form) &&
+        !(Form == llvm::dwarf::Form::DW_FORM_strp && !IsFirstStrp)) {
       auto Value = SaturatingAdd(*FormSize, DistinctDataOffset, &DidOverflow);
       if (DidOverflow)
         return createStringError(
@@ -951,6 +1033,17 @@ static Error materializeCUDie(DWARFCompileUnit &DCU,
       memcpy(&SectionContents[SectionOffset],
              &DistinctDataArrayRef[DistinctDataOffset], *FormSize);
       DistinctDataOffset += *FormSize;
+      if (IsFirstStrp && Form == llvm::dwarf::Form::DW_FORM_strp)
+        IsFirstStrp = false;
+    } else if (Form == llvm::dwarf::Form::DW_FORM_strp && !IsFirstStrp) {
+      auto StringOffsetIt =
+          MapOfStringOffsets.find(DebugStringRefsVec[DebugStringIndex]);
+      if (StringOffsetIt == MapOfStringOffsets.end())
+        return createStringError(inconvertibleErrorCode(),
+                                 "Could not find DebugStrRef offset in map");
+      // TODO: Add support for 64 bit DWARF
+      memcpy(&SectionContents[SectionOffset], &StringOffsetIt->second, 4);
+      DebugStringIndex++;
     } else {
       auto Value = SaturatingAdd(*FormSize, CUOffset, &DidOverflow);
       if (DidOverflow)
@@ -968,10 +1061,10 @@ static Error materializeCUDie(DWARFCompileUnit &DCU,
   return Error::success();
 }
 
-Expected<uint64_t>
-DebugInfoSectionRef::materialize(MCCASReader &Reader,
-                                 ArrayRef<char> AbbrevSectionContents,
-                                 raw_ostream *Stream) const {
+Expected<uint64_t> DebugInfoSectionRef::materialize(
+    MCCASReader &Reader, ArrayRef<char> AbbrevSectionContents,
+    DenseMap<cas::ObjectRef, unsigned> MapOfStringOffsets,
+    raw_ostream *Stream) const {
   // Start a new section for relocations.
   Reader.Relocations.emplace_back();
   auto LoadedSection = LoadedDebugInfoSection::load(*this);
@@ -1003,7 +1096,11 @@ DebugInfoSectionRef::materialize(MCCASReader &Reader,
   Abbrev.extract(DataExtractor(toStringRef(AbbrevSectionContents),
                                Reader.getEndian() == support::little, 8));
   uint64_t DistinctDataOffset = 0;
-  for (auto CUData : CUContents) {
+  assert(CUContents.size() == LoadedSection->DebugStringRefs.size() &&
+         "Number of Compile Units and number of DebugStringRef vectors must be "
+         "the same!");
+  for (auto [CUData, DebugStringRefVec] :
+       llvm::zip(CUContents, LoadedSection->DebugStringRefs)) {
 
     uint64_t OffsetPtr = 0;
     DWARFUnitHeader Header;
@@ -1057,11 +1154,14 @@ DebugInfoSectionRef::materialize(MCCASReader &Reader,
                          CASObj.getStrSection(), CASObj.getStrOffsetsSection(),
                          &CASObj.getAddrSection(), CASObj.getLocSection(),
                          Reader.getEndian() == support::little, false, UV);
+    bool IsFirstStrp = true;
+    unsigned DebugStringIndex = 0;
     while (CUOffset < CUData.size()) {
       auto Err = materializeCUDie(
           DCU, SectionData, toStringRef(CUData),
-          arrayRefFromStringRef<char>(LoadedSection->DistinctData), CUOffset,
-          DistinctDataOffset, SectionOffset);
+          arrayRefFromStringRef<char>(LoadedSection->DistinctData),
+          MapOfStringOffsets, DebugStringRefVec, CUOffset, DistinctDataOffset,
+          SectionOffset, IsFirstStrp, DebugStringIndex);
       if (Err)
         return std::move(Err);
     }
@@ -1123,6 +1223,39 @@ Expected<uint64_t> SectionRef::materialize(MCCASReader &Reader,
 
 Expected<uint64_t>
 DebugAbbrevSectionRef::materialize(MCCASReader &Reader,
+                                   raw_ostream *Stream) const {
+  // Start a new section for relocations.
+  Reader.Relocations.emplace_back();
+  SmallVector<char, 0> SectionContents;
+  raw_svector_ostream SectionStream(SectionContents);
+
+  unsigned Size = 0;
+  StringRef Remaining = getData();
+  auto Refs = decodeReferences(*this, Remaining);
+  if (!Refs)
+    return Refs.takeError();
+
+  for (auto ID : *Refs) {
+    auto FragmentSize = Reader.materializeSection(ID, &SectionStream);
+    if (!FragmentSize)
+      return FragmentSize.takeError();
+    Size += *FragmentSize;
+  }
+
+  if (auto E = decodeRelocationsAndAddends(Reader, Remaining))
+    return std::move(E);
+
+  if (auto E = applyAddends(Reader, SectionContents))
+    return std::move(E);
+
+  Reader.Addends.clear();
+  Reader.OS << SectionContents;
+
+  return Size;
+}
+
+Expected<uint64_t>
+DebugStringSectionRef::materialize(MCCASReader &Reader,
                                    raw_ostream *Stream) const {
   // Start a new section for relocations.
   Reader.Relocations.emplace_back();
@@ -1667,9 +1800,9 @@ Error MCCASBuilder::createStringSection(
 
   while (!S.empty()) {
     auto SplitSym = S.split('\0');
-    DebugStringOffset += SplitSym.first.size() + 1;
     if (auto E = CreateFn(SplitSym.first, DebugStringOffset))
       return E;
+    DebugStringOffset += SplitSym.first.size() + 1;
 
     S = SplitSym.second;
   }
@@ -1901,7 +2034,8 @@ partitionCUDie(MCCASBuilder &Builder,
     if (is_contained(InMemoryCASDWARFObject::PartitionedDebugInfoSection::
                          FormsToPartition,
                      AttrValue.Value.getForm()) &&
-        IsFirstStrp) {
+        !(AttrValue.Value.getForm() == llvm::dwarf::Form::DW_FORM_strp &&
+          !IsFirstStrp)) {
       append_range(SplitData.DistinctData,
                    DebugInfoData.slice(AttrValue.Offset, AttrValue.ByteSize));
       if (AttrValue.Value.getForm() == llvm::dwarf::DW_FORM_strp)
@@ -2103,7 +2237,7 @@ Error MCCASBuilder::createDebugStrSection(
   startSection(DwarfSections.Str);
   for (auto DebugStringRef : DebugStringRefs)
     addNode(DebugStringRef);
-  return finalizeSection();
+  return finalizeSection<DebugStringSectionRef>();
 }
 
 static void createAddendVector(
@@ -2522,6 +2656,8 @@ Expected<uint64_t> MCCASReader::materializeGroup(cas::ObjectRef ID) {
 
   // Group can have sections, symbol table strs.
   if (auto F = SectionRef::Cast(*Node))
+    return F->materialize(*this);
+  if (auto F = DebugStringSectionRef::Cast(*Node))
     return F->materialize(*this);
   if (auto F = CStringRef::Cast(*Node)) {
     auto Size = F->materialize(OS);
