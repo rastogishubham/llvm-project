@@ -333,7 +333,7 @@ class DebugInfoCURef : public SpecificRef<DebugInfoCURef> {
   friend class SpecificRef<DebugInfoCURef>;
 
 public:
-  static constexpr StringLiteral KindString = "debug_info_cu";
+  static constexpr StringLiteral KindString = "mc:debug_info_cu";
   static Expected<DebugInfoCURef> create(MCCASBuilder &MB, StringRef Data,
                                          ArrayRef<cas::ObjectRef> Refs);
   static Expected<DebugInfoCURef> get(Expected<MCObjectProxy> Ref);

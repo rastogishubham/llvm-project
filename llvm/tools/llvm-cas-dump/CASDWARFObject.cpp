@@ -80,7 +80,8 @@ Error CASDWARFObject::discoverDebugInfoSection(MCObjectProxy MCObj,
     raw_svector_ostream OS(DebugInfoSection);
     MCCASReader Reader(OS, Target, MCObj.getSchema());
     auto Written = DbgInfoSecRef->materialize(
-        Reader, arrayRefFromStringRef<char>(getAbbrevSection()), &OS);
+        Reader, arrayRefFromStringRef<char>(getAbbrevSection()),
+        getMapOfStringOffsets(), &OS);
     if (!Written)
       return Written.takeError();
 
@@ -147,6 +148,7 @@ Error CASDWARFObject::discoverDwarfSections(MCObjectProxy MCObj) {
   else if (DebugStrRef::Cast(MCObj)) {
     DebugStringSection.append(Data.begin(), Data.end());
     DebugStringSection.push_back(0);
+    MapOfStringOffsets.try_emplace(MCObj.getRef(), DebugStringSection.size());
   }
   return MCObj.forEachReference(
       [this](ObjectRef CASObj) { return discoverDwarfSections(CASObj); });

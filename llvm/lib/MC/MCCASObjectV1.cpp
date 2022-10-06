@@ -980,7 +980,7 @@ materializeCUDie(DWARFCompileUnit &DCU, MutableArrayRef<char> SectionContents,
                  DenseMap<cas::ObjectRef, unsigned> MapOfStringOffsets,
                  ArrayRef<cas::ObjectRef> DebugStringRefsVec,
                  uint64_t &CUOffset, uint64_t &DistinctDataOffset,
-                 uint64_t &SectionOffset, bool &IsFirstStrp,
+                 uint64_t &SectionOffset, unsigned &StrpCount,
                  unsigned &DebugStringIndex) {
   // Copy Abbrev Tag.
   DWARFDataExtractor DWARFExtractor(CUData, DCU.isLittleEndian(),
@@ -1020,7 +1020,7 @@ materializeCUDie(DWARFCompileUnit &DCU, MutableArrayRef<char> SectionContents,
     if (is_contained(InMemoryCASDWARFObject::PartitionedDebugInfoSection::
                          FormsToPartition,
                      Form) &&
-        !(Form == llvm::dwarf::Form::DW_FORM_strp && !IsFirstStrp)) {
+        !(Form == llvm::dwarf::Form::DW_FORM_strp && StrpCount != 1)) {
       auto Value = SaturatingAdd(*FormSize, DistinctDataOffset, &DidOverflow);
       if (DidOverflow)
         return createStringError(
@@ -1033,9 +1033,10 @@ materializeCUDie(DWARFCompileUnit &DCU, MutableArrayRef<char> SectionContents,
       memcpy(&SectionContents[SectionOffset],
              &DistinctDataArrayRef[DistinctDataOffset], *FormSize);
       DistinctDataOffset += *FormSize;
-      if (IsFirstStrp && Form == llvm::dwarf::Form::DW_FORM_strp)
-        IsFirstStrp = false;
-    } else if (Form == llvm::dwarf::Form::DW_FORM_strp && !IsFirstStrp) {
+      if (StrpCount == 1 && Form == llvm::dwarf::Form::DW_FORM_strp)
+        StrpCount++;
+    } else if (Form == llvm::dwarf::Form::DW_FORM_strp && StrpCount != 1) {
+      StrpCount++;
       auto StringOffsetIt =
           MapOfStringOffsets.find(DebugStringRefsVec[DebugStringIndex]);
       if (StringOffsetIt == MapOfStringOffsets.end())
@@ -1154,14 +1155,14 @@ Expected<uint64_t> DebugInfoSectionRef::materialize(
                          CASObj.getStrSection(), CASObj.getStrOffsetsSection(),
                          &CASObj.getAddrSection(), CASObj.getLocSection(),
                          Reader.getEndian() == support::little, false, UV);
-    bool IsFirstStrp = true;
+    unsigned StrpCount = 0;
     unsigned DebugStringIndex = 0;
     while (CUOffset < CUData.size()) {
       auto Err = materializeCUDie(
           DCU, SectionData, toStringRef(CUData),
           arrayRefFromStringRef<char>(LoadedSection->DistinctData),
           MapOfStringOffsets, DebugStringRefVec, CUOffset, DistinctDataOffset,
-          SectionOffset, IsFirstStrp, DebugStringIndex);
+          SectionOffset, StrpCount, DebugStringIndex);
       if (Err)
         return std::move(Err);
     }
@@ -2020,7 +2021,7 @@ partitionCUDie(MCCASBuilder &Builder,
                InMemoryCASDWARFObject::PartitionedDebugInfoSection &SplitData,
                DWARFDie &CUDie, ArrayRef<char> DebugInfoData,
                uint64_t &CUOffset, bool IsLittleEndian, uint8_t AddressSize,
-               bool IsFirstStrp) {
+               unsigned StrpCount) {
 
   // Copy Abbrev Tag
   DWARFDataExtractor DWARFExtractor(toStringRef(DebugInfoData), IsLittleEndian,
@@ -2035,13 +2036,14 @@ partitionCUDie(MCCASBuilder &Builder,
                          FormsToPartition,
                      AttrValue.Value.getForm()) &&
         !(AttrValue.Value.getForm() == llvm::dwarf::Form::DW_FORM_strp &&
-          !IsFirstStrp)) {
+          StrpCount != 1)) {
       append_range(SplitData.DistinctData,
                    DebugInfoData.slice(AttrValue.Offset, AttrValue.ByteSize));
       if (AttrValue.Value.getForm() == llvm::dwarf::DW_FORM_strp)
-        IsFirstStrp = false;
-    } else if (!IsFirstStrp &&
+        StrpCount++;
+    } else if (StrpCount != 1 &&
                AttrValue.Value.getForm() == llvm::dwarf::DW_FORM_strp) {
+      StrpCount++;
       // TODO: Add support for 64-bit DWARF
       uint32_t StringOffset;
       memcpy(&StringOffset, &DebugInfoData[AttrValue.Offset], 4);
@@ -2058,7 +2060,7 @@ partitionCUDie(MCCASBuilder &Builder,
   DWARFDie Child = CUDie.getFirstChild();
   while (Child && Child.getAbbreviationDeclarationPtr()) {
     partitionCUDie(Builder, SplitData, Child, DebugInfoData, CUOffset,
-                   IsLittleEndian, AddressSize, IsFirstStrp);
+                   IsLittleEndian, AddressSize, StrpCount);
     Child = Child.getSibling();
   }
   if (Child && !Child.getAbbreviationDeclarationPtr()) {
@@ -2123,8 +2125,9 @@ InMemoryCASDWARFObject::splitUpCUData(MCCASBuilder &Builder,
     if (!C)
       return C.takeError();
 
+    unsigned StrpCount = 0;
     partitionCUDie(Builder, SplitData, CUDie, DebugInfoData, CUOffset,
-                   IsLittleEndian, DCU.getAddressByteSize(), true);
+                   IsLittleEndian, DCU.getAddressByteSize(), StrpCount);
   }
   return SplitData;
 }
