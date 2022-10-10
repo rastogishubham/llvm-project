@@ -987,7 +987,7 @@ materializeCUDie(DWARFCompileUnit &DCU, MutableArrayRef<char> SectionContents,
                                     DCU.getAddressByteSize());
   uint64_t PrevOffset = CUOffset;
   uint64_t AbbrevTag = DWARFExtractor.getULEB128(&CUOffset);
-  std::memcpy(&SectionContents[SectionOffset], &AbbrevTag,
+  std::memcpy(&SectionContents[SectionOffset], &CUData.data()[PrevOffset],
               CUOffset - PrevOffset);
   SectionOffset += CUOffset - PrevOffset;
 
