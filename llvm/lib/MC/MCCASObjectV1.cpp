@@ -977,7 +977,7 @@ static Expected<uint64_t> getFormSize(dwarf::Form FormVal, dwarf::FormParams FP,
 static Error
 materializeCUDie(DWARFCompileUnit &DCU, MutableArrayRef<char> SectionContents,
                  StringRef CUData, ArrayRef<char> DistinctDataArrayRef,
-                 DenseMap<cas::ObjectRef, unsigned> MapOfStringOffsets,
+                 DenseMap<cas::ObjectRef, unsigned> &MapOfStringOffsets,
                  ArrayRef<cas::ObjectRef> DebugStringRefsVec,
                  uint64_t &CUOffset, uint64_t &DistinctDataOffset,
                  uint64_t &SectionOffset, unsigned &StrpCount,
@@ -1064,7 +1064,7 @@ materializeCUDie(DWARFCompileUnit &DCU, MutableArrayRef<char> SectionContents,
 
 Expected<uint64_t> DebugInfoSectionRef::materialize(
     MCCASReader &Reader, ArrayRef<char> AbbrevSectionContents,
-    DenseMap<cas::ObjectRef, unsigned> MapOfStringOffsets,
+    DenseMap<cas::ObjectRef, unsigned> &MapOfStringOffsets,
     raw_ostream *Stream) const {
   // Start a new section for relocations.
   Reader.Relocations.emplace_back();

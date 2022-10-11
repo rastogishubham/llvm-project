@@ -649,7 +649,7 @@ public:
   }
   Expected<uint64_t>
   materialize(MCCASReader &Reader, ArrayRef<char> AbbrevSectionContents,
-              DenseMap<cas::ObjectRef, unsigned> MapOfStringOffsets,
+              DenseMap<cas::ObjectRef, unsigned> &MapOfStringOffsets,
               raw_ostream *Stream = nullptr) const;
 
 private:
