@@ -28,6 +28,7 @@ add_llvm_component_library(LLVMLTO
   Instrumentation
   Linker
   MC
+  MCCAS
   ObjCARC
   Object
   Passes

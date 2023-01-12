@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/MC/CAS/MCCASObjectV1.h"
+#include "llvm/MCCAS/MCCASObjectV1.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/BinaryFormat/MachO.h"
 #include "llvm/CAS/CASID.h"
@@ -16,7 +16,7 @@
 #include "llvm/DebugInfo/DWARF/DWARFDataExtractor.h"
 #include "llvm/DebugInfo/DWARF/DWARFDebugAbbrev.h"
 #include "llvm/DebugInfo/DWARF/DWARFDebugLine.h"
-#include "llvm/MC/CAS/MCCASDebugV1.h"
+#include "llvm/MCCAS/MCCASDebugV1.h"
 #include "llvm/MC/MCAsmBackend.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCObjectFileInfo.h"
@@ -45,7 +45,7 @@ constexpr StringLiteral PaddingRef::KindString;
   constexpr StringLiteral RefName::KindString;
 #define MCFRAGMENT_NODE_REF(MCFragmentName, MCEnumName, MCEnumIdentifier)      \
   constexpr StringLiteral MCFragmentName##Ref::KindString;
-#include "llvm/MC/CAS/MCCASObjectV1.def"
+#include "llvm/MCCAS/MCCASObjectV1.def"
 constexpr StringLiteral DebugInfoSectionRef::KindString;
 
 void MCSchema::anchor() {}
@@ -161,7 +161,7 @@ Error MCSchema::fillCache() {
 #define CASV1_SIMPLE_GROUP_REF(RefName, IdentifierName) RefName::KindString,
 #define MCFRAGMENT_NODE_REF(MCFragmentName, MCEnumName, MCEnumIdentifier)      \
   MCFragmentName##Ref::KindString,
-#include "llvm/MC/CAS/MCCASObjectV1.def"
+#include "llvm/MCCAS/MCCASObjectV1.def"
   };
   cas::ObjectRef Refs[] = {*RootKindID};
   SmallVector<cas::ObjectRef> IDs = {*RootKindID};
@@ -288,7 +288,7 @@ static Expected<StringRef> consumeDataOfSize(StringRef &Data, unsigned Size) {
       return Specific.takeError();                                             \
     return RefName(*Specific);                                                 \
   }
-#include "llvm/MC/CAS/MCCASObjectV1.def"
+#include "llvm/MCCAS/MCCASObjectV1.def"
 
 Expected<PaddingRef> PaddingRef::create(MCCASBuilder &MB, uint64_t Size) {
   // Fake a FT_Fill Fragment that is zero filled.
@@ -1335,7 +1335,7 @@ MCSymbolIdFragmentRef::materialize(MCCASReader &Reader,
     return getData().size();                                                   \
   }
 #define MCFRAGMENT_ENCODED_FRAGMENT_ONLY
-#include "llvm/MC/CAS/MCCASObjectV1.def"
+#include "llvm/MCCAS/MCCASObjectV1.def"
 
 Expected<MCAssemblerRef> MCAssemblerRef::get(Expected<MCObjectProxy> Ref) {
   auto Specific = SpecificRefT::getSpecific(std::move(Ref));
@@ -1384,7 +1384,7 @@ Error MCCASBuilder::buildFragment(const MCFragment &F, unsigned Size) {
     addNode(*FN);                                                              \
     return Error::success();                                                   \
   }
-#include "llvm/MC/CAS/MCCASObjectV1.def"
+#include "llvm/MCCAS/MCCASObjectV1.def"
   }
   llvm_unreachable("unknown fragment");
 }
@@ -1499,7 +1499,7 @@ Error MCDataFragmentMerger::emitMergedFragments() {
     break;                                                                     \
   }
 #define MCFRAGMENT_ENCODED_FRAGMENT_ONLY
-#include "llvm/MC/CAS/MCCASObjectV1.def"
+#include "llvm/MCCAS/MCCASObjectV1.def"
     case MCFragment::FT_Align: {
       const MCAlignFragment *AF = cast<MCAlignFragment>(F.first);
       if (auto E = writeAlignFragment(Builder, *AF, FragmentOS, F.second))
@@ -2430,7 +2430,7 @@ Expected<uint64_t> MCCASReader::materializeAtom(cas::ObjectRef ID,
 #define MCFRAGMENT_NODE_REF(MCFragmentName, MCEnumName, MCEnumIdentifier)      \
   if (auto F = MCFragmentName##Ref::Cast(*Node))                               \
     return F->materialize(*this, Stream);
-#include "llvm/MC/CAS/MCCASObjectV1.def"
+#include "llvm/MCCAS/MCCASObjectV1.def"
   if (auto F = PaddingRef::Cast(*Node))
     return F->materialize(*Stream);
   if (auto F = MergedFragmentRef::Cast(*Node))

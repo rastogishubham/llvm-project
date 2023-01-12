@@ -3,6 +3,7 @@ set(LLVM_LINK_COMPONENTS
   DebugInfoDWARF
   DebugInfoGSYM
   MC
+  MCCAS
   Object
   Support
   Target

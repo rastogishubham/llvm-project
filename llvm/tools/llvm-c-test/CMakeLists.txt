@@ -10,6 +10,7 @@ set(LLVM_LINK_COMPONENTS
   Object
   Support
   Target
+  MCCAS
   )
 
 # We should only have llvm-c-test use libLLVM if libLLVM is built with the

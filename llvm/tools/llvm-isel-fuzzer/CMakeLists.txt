@@ -13,6 +13,7 @@ set(LLVM_LINK_COMPONENTS
     FuzzMutate
     IRReader
     MC
+    MCCAS
     ScalarOpts
     SelectionDAG
     Support

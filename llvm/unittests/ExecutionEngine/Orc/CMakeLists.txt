@@ -13,6 +13,7 @@ set(LLVM_LINK_COMPONENTS
   Support
   TargetParser
   native
+  MCCAS
   )
 
 add_llvm_unittest(OrcJITTests

@@ -4,6 +4,7 @@ set(LLVM_LINK_COMPONENTS
   BinaryFormat
   DebugInfoDWARF
   MC
+  MCCAS
   Object
   ObjectYAML
   Support

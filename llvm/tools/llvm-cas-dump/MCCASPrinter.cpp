@@ -9,7 +9,7 @@
 #include "MCCASPrinter.h"
 #include "CASDWARFObject.h"
 #include "llvm/DebugInfo/DWARF/DWARFContext.h"
-#include "llvm/MC/CAS/MCCASDebugV1.h"
+#include "llvm/MCCAS/MCCASDebugV1.h"
 #include "llvm/Support/DataExtractor.h"
 #include "llvm/Support/FormatVariadic.h"
 

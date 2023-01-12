@@ -10,6 +10,7 @@ set(LLVM_LINK_COMPONENTS
   Interpreter
   JITLink
   MC
+  MCCAS
   MCJIT
   Object
   OrcShared

@@ -46,7 +46,7 @@
 #include "llvm/CASObjectFormats/Utils.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/LinkAllPasses.h"
-#include "llvm/MC/CAS/MCCASObjectV1.h"
+#include "llvm/MCCAS/MCCASObjectV1.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"

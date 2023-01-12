@@ -10,6 +10,7 @@ set(LLVM_LINK_COMPONENTS
   Core
   IRReader
   MC
+  MCCAS
   MIRParser
   Passes
   Support

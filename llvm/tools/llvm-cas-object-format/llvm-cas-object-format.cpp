@@ -19,7 +19,7 @@
 #include "llvm/ExecutionEngine/JITLink/JITLink.h"
 #include "llvm/ExecutionEngine/JITLink/MachO.h"
 #include "llvm/ExecutionEngine/JITLink/MachO_x86_64.h"
-#include "llvm/MC/CAS/MCCASObjectV1.h"
+#include "llvm/MCCAS/MCCASObjectV1.h"
 #include "llvm/RemoteCachingService/RemoteCachingService.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"

@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/MC/CAS/MCCASDebugV1.h"
+#include "llvm/MCCAS/MCCASDebugV1.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/DebugInfo/DWARF/DWARFDataExtractor.h"
 

@@ -21,6 +21,7 @@ set(LLVM_LINK_COMPONENTS
   TargetParser
   TransformUtils
   Vectorize
+  MCCAS
   )
 
 add_llvm_tool(bugpoint

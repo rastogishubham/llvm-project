@@ -8,7 +8,7 @@
 
 #include "MCCASPrinter.h"
 #include "llvm/CASObjectFormats/Utils.h"
-#include "llvm/MC/CAS/MCCASObjectV1.h"
+#include "llvm/MCCAS/MCCASObjectV1.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"

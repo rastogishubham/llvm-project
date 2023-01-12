@@ -112,8 +112,8 @@
 #include "llvm/BinaryFormat/MachO.h"
 #include "llvm/CAS/CASID.h"
 #include "llvm/CAS/ObjectStore.h"
-#include "llvm/MC/CAS/MCCASFormatSchemaBase.h"
-#include "llvm/MC/CAS/MCCASReader.h"
+#include "llvm/MCCAS/MCCASFormatSchemaBase.h"
+#include "llvm/MCCAS/MCCASReader.h"
 #include "llvm/MC/MCAsmLayout.h"
 #include "llvm/Support/BinaryStreamReader.h"
 #include "llvm/Support/DataExtractor.h"
@@ -352,7 +352,7 @@ protected:
   private:                                                                     \
     explicit MCFragmentName##Ref(SpecificRefT Ref) : SpecificRefT(Ref) {}      \
   };
-#include "llvm/MC/CAS/MCCASObjectV1.def"
+#include "llvm/MCCAS/MCCASObjectV1.def"
 
 class PaddingRef : public SpecificRef<PaddingRef> {
   using SpecificRefT = SpecificRef<PaddingRef>;

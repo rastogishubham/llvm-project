@@ -10,6 +10,7 @@ set(LLVM_LINK_COMPONENTS
   DebugInfoDWARF
   DWARFLinker
   MC
+  MCCAS
   Object
   CodeGen
   Option

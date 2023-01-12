@@ -15,7 +15,7 @@
 #include "llvm/DebugInfo/DWARF/DWARFDebugAbbrev.h"
 #include "llvm/DebugInfo/DWARF/DWARFDebugLine.h"
 #include "llvm/DebugInfo/DWARF/DWARFObject.h"
-#include "llvm/MC/CAS/MCCASObjectV1.h"
+#include "llvm/MCCAS/MCCASObjectV1.h"
 
 namespace llvm {
 

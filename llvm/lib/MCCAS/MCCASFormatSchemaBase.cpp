@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/MC/CAS/MCCASFormatSchemaBase.h"
-#include "llvm/MC/CAS/MCCASObjectV1.h"
+#include "llvm/MCCAS/MCCASFormatSchemaBase.h"
+#include "llvm/MCCAS/MCCASObjectV1.h"
 
 using namespace llvm;
 using namespace llvm::mccasformats;

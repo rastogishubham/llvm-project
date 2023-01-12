@@ -5,6 +5,7 @@ set(LLVM_LINK_COMPONENTS
   AllTargetsInfos
   CAS
   MC
+  MCCAS
   MCParser
   Support
   TargetParser

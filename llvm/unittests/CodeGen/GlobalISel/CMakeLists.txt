@@ -5,6 +5,7 @@ set(LLVM_LINK_COMPONENTS
   FileCheck
   GlobalISel
   MC
+  MCCAS
   MIRParser
   Support
   Target

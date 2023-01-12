@@ -3,6 +3,7 @@ set(LLVM_LINK_COMPONENTS
   Support
   CAS
   CASObjectFormats
+  MCCAS
   )
 
 add_llvm_tool(llvm-cas-dump

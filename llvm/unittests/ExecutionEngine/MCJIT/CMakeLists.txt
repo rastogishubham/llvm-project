@@ -3,6 +3,7 @@ set(LLVM_LINK_COMPONENTS
   Core
   ExecutionEngine
   MC
+  MCCAS
   MCJIT
   Passes
   RuntimeDyld

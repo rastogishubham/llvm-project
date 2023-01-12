@@ -12,9 +12,6 @@ add_llvm_component_library(LLVMMC
   MCAsmMacro.cpp
   MCAsmStreamer.cpp
   MCAssembler.cpp
-  MCCASDebugV1.cpp
-  MCCASObjectV1.cpp
-  MCCASFormatSchemaBase.cpp
   MCCodeEmitter.cpp
   MCCodeView.cpp
   MCContext.cpp
@@ -84,7 +81,6 @@ add_llvm_component_library(LLVMMC
   CAS
   CASObjectFormats
   DebugInfoCodeView
-  DebugInfoDWARF
   )
 
 add_subdirectory(MCParser)

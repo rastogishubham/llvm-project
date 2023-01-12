@@ -6,6 +6,7 @@ set(LLVM_LINK_COMPONENTS
   DebugInfoDWARF
   DWARFLinker
   MC
+  MCCAS
   ObjCopy
   Object
   Option

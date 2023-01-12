@@ -2,6 +2,7 @@ set( LLVM_LINK_COMPONENTS
   ${LLVM_TARGETS_TO_BUILD}
   Option
   Support
+  MCCAS
   )
 
 add_clang_tool(clang-check

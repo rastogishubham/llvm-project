@@ -10,8 +10,8 @@
 #define LLVM_TOOLS_LLVM_CAS_DUMP_MCCASPRINTER_H
 
 #include "CASDWARFObject.h"
-#include "llvm/MC/CAS/MCCASDebugV1.h"
-#include "llvm/MC/CAS/MCCASObjectV1.h"
+#include "llvm/MCCAS/MCCASDebugV1.h"
+#include "llvm/MCCAS/MCCASObjectV1.h"
 #include "llvm/Support/Error.h"
 
 namespace llvm {

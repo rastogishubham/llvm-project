@@ -4,6 +4,7 @@ set(exegesis_includes
 
 set(LLVM_LINK_COMPONENTS
   MC
+  MCCAS
   MCParser
   Object
   Support

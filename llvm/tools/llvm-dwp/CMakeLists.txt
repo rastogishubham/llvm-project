@@ -5,6 +5,7 @@ set(LLVM_LINK_COMPONENTS
   DebugInfoDWARF
   DWP
   MC
+  MCCAS
   Object
   Support
   TargetParser

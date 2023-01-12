@@ -150,6 +150,7 @@ add_clang_library(libclang ${ENABLE_SHARED} ${ENABLE_STATIC} INSTALL_WITH_TOOLCH
   Core
   Support
   TargetParser
+  MCCAS
   )
 
 if(ENABLE_STATIC)

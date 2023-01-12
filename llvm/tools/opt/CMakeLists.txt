@@ -18,6 +18,7 @@ set(LLVM_LINK_COMPONENTS
   InstCombine
   Instrumentation
   MC
+  MCCAS
   ObjCARCOpts
   Remarks
   ScalarOpts

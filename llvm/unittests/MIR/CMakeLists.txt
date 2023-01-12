@@ -4,6 +4,7 @@ set(LLVM_LINK_COMPONENTS
   Core
   FileCheck
   MC
+  MCCAS
   MIRParser
   Support
   Target

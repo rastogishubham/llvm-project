@@ -10,6 +10,7 @@ set(LLVM_LINK_COMPONENTS
   ExecutionEngine
   JITLink
   MC
+  MCCAS
   Object
   OrcJIT
   OrcShared

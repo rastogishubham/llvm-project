@@ -11,6 +11,7 @@ set(LLVM_LINK_COMPONENTS
   Core
   GlobalISel
   MC
+  MCCAS
   MIRParser
   SelectionDAG
   Support

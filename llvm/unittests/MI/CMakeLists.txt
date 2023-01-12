@@ -3,6 +3,7 @@ set(LLVM_LINK_COMPONENTS
   CodeGen
   Core
   MC
+  MCCAS
   MIRParser
   Support
   Target
