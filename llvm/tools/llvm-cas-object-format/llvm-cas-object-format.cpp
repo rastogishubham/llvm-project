@@ -14,7 +14,7 @@
 #include "llvm/CASObjectFormats/FlatV1.h"
 #include "llvm/CASObjectFormats/LinkGraph.h"
 #include "llvm/CASObjectFormats/NestedV1.h"
-#include "llvm/CASObjectFormats/Utils.h"
+#include "llvm/CASUtil/Utils.h"
 #include "llvm/ExecutionEngine/JITLink/ELF_x86_64.h"
 #include "llvm/ExecutionEngine/JITLink/JITLink.h"
 #include "llvm/ExecutionEngine/JITLink/MachO.h"
@@ -819,7 +819,27 @@ static Error printCASObject(ObjectFormatSchemaPool &Pool, ObjectProxy ID,
   auto Reader = Pool.createObjectReader(ID);
   if (Error E = Reader.takeError())
     return E;
-  return printCASObject(**Reader, outs(), omitCASID);
+  Triple TT = (*Reader)->getTargetTriple();
+  auto EdgeKindNameFn = jitlink::getGetEdgeKindNameFunction(TT);
+  if (auto E = EdgeKindNameFn.takeError())
+    return E;
+
+  std::function<const char *(uint8_t)> GetEdgeName;
+  llvm::jitlink::LinkGraph::GetEdgeKindNameFunction EdgeKindName =
+      *EdgeKindNameFn;
+  GetEdgeName = [&EdgeKindName](uint8_t Kind) -> const char * {
+    return EdgeKindName(Kind);
+  };
+  std::function<const char *(uint8_t)> GetScopeName =
+      [](uint8_t Scope) -> const char * {
+    return jitlink::getScopeName((jitlink::Scope)Scope);
+  };
+  std::function<const char *(uint8_t)> GetLinkageName =
+      [](uint8_t Linkage) -> const char * {
+    return jitlink::getLinkageName((jitlink::Linkage)Linkage);
+  };
+  return printCASObject(**Reader, outs(), omitCASID, GetEdgeName, GetScopeName,
+                        GetLinkageName);
 }
 
 static Error printCASObjectOrTree(ObjectFormatSchemaPool &Pool, ObjectProxy ID,

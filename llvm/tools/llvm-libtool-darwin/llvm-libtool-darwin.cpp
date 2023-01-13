@@ -13,7 +13,7 @@
 #include "DependencyInfo.h"
 #include "llvm/BinaryFormat/Magic.h"
 #include "llvm/CAS/ObjectStore.h"
-#include "llvm/CASObjectFormats/Utils.h"
+#include "llvm/CASUtil/Utils.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Object/ArchiveWriter.h"
 #include "llvm/Object/IRObjectFile.h"

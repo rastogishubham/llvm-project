@@ -44,7 +44,7 @@
 #include "llvm/CAS/HierarchicalTreeBuilder.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/CASObjectFormats/ObjectFormatSchemaBase.h"
-#include "llvm/CASObjectFormats/Utils.h"
+#include "llvm/CASUtil/Utils.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/LTO/LTO.h"
 #include "llvm/Object/Archive.h"

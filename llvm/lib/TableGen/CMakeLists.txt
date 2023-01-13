@@ -18,4 +18,5 @@ add_llvm_component_library(LLVMTableGen
 
   LINK_COMPONENTS
   Support
+  CAS
   )

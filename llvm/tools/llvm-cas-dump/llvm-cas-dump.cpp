@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "MCCASPrinter.h"
-#include "llvm/CASObjectFormats/Utils.h"
+#include "llvm/CASUtil/Utils.h"
 #include "llvm/MCCAS/MCCASObjectV1.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"

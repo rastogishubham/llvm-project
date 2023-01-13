@@ -5,7 +5,6 @@ add_llvm_component_library(LLVMCASObjectFormats
   NestedV1.cpp
   ObjectFormatSchemaBase.cpp
   ObjectFormatHelpers.cpp
-  Utils.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${LLVM_MAIN_INCLUDE_DIR}/llvm/CASObjectFormats

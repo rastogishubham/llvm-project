@@ -79,7 +79,7 @@ add_llvm_component_library(LLVMMC
   TargetParser
   BinaryFormat
   CAS
-  CASObjectFormats
+  CASUtil
   DebugInfoCodeView
   )
 

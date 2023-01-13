@@ -1,4 +1,4 @@
-//===- llvm/CASObjectFormats/Utils.h ----------------------------*- C++ -*-===//
+//===- llvm/CASUtil/Utils.h ----------------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -25,7 +25,7 @@ Expected<CASID> readCASIDBuffer(cas::ObjectStore &CAS,
 
 void writeCASIDBuffer(const CASID &ID, llvm::raw_ostream &OS);
 
-}
+} // namespace cas
 
 namespace casobjectformats {
 
@@ -34,7 +34,10 @@ class CASObjectReader;
 }
 
 Error printCASObject(const reader::CASObjectReader &Reader, raw_ostream &OS,
-                     bool omitCASID);
+                     bool omitCASID,
+                     std::function<const char *(uint8_t)> GetEdgeName,
+                     std::function<const char *(uint8_t)> GetScopeName,
+                     std::function<const char *(uint8_t)> GetLinkageName);
 
 } // end namespace casobjectformats
 } // end namespace llvm

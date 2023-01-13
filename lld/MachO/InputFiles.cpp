@@ -65,7 +65,7 @@
 #include "llvm/BinaryFormat/MachO.h"
 #include "llvm/CASObjectFormats/CASObjectReader.h"
 #include "llvm/CASObjectFormats/ObjectFormatSchemaBase.h"
-#include "llvm/CASObjectFormats/Utils.h"
+#include "llvm/CASUtil/Utils.h"
 #include "llvm/ExecutionEngine/JITLink/x86_64.h"
 #include "llvm/LTO/LTO.h"
 #include "llvm/Support/BinaryStreamReader.h"

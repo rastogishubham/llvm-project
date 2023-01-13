@@ -1,4 +1,4 @@
-//===- CASObjectFormats/Utils.cpp -----------------------------------------===//
+//===- CASUtil/Utils.cpp -----------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,14 +6,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/CASObjectFormats/Utils.h"
+#include "llvm/CASUtil/Utils.h"
 #include "llvm/BinaryFormat/Magic.h"
+#include "llvm/CAS/CASID.h"
+#include "llvm/CAS/ObjectStore.h"
 #include "llvm/CASObjectFormats/CASObjectReader.h"
 #include "llvm/CASObjectFormats/Encoding.h"
 #include "llvm/ExecutionEngine/JITLink/JITLink.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/CAS/CASID.h"
-#include "llvm/CAS/ObjectStore.h"
 
 using namespace llvm;
 using namespace llvm::cas;
@@ -72,7 +72,7 @@ static std::string getDescription(const CASBlock &Info) {
 
 static std::string
 getDescription(const CASBlockFixup &Fixup, StringRef TargetName,
-               llvm::jitlink::LinkGraph::GetEdgeKindNameFunction EdgeKindFn) {
+               std::function<const char *(uint8_t)> GetEdgeName) {
   std::string Description;
   {
     raw_string_ostream OS(Description);
@@ -81,12 +81,15 @@ getDescription(const CASBlockFixup &Fixup, StringRef TargetName,
       OS << formatv("+{0:x8}", Fixup.Addend);
     else
       OS << formatv("-{0:x8}", -Fixup.Addend);
-    OS << ", kind = " << EdgeKindFn(Fixup.Kind) << ", target = " << TargetName;
+    OS << ", kind = " << GetEdgeName(Fixup.Kind) << ", target = " << TargetName;
   }
   return Description;
 }
 
-static std::string getDescription(StringRef Name, const CASSymbol &Info) {
+static std::string
+getDescription(StringRef Name, const CASSymbol &Info,
+               std::function<const char *(uint8_t)> GetScopeName,
+               std::function<const char *(uint8_t)> GetLinkageName) {
   bool IsDefined = Info.isDefined();
   std::string Description;
   {
@@ -96,9 +99,9 @@ static std::string getDescription(StringRef Name, const CASSymbol &Info) {
       OS << "offset: " << formatv("{0:x4}", Info.Offset) << ", ";
     }
     OS << "linkage: "
-       << formatv("{0:6}", jitlink::getLinkageName(Info.Linkage));
+       << formatv("{0:6}", GetLinkageName((uint8_t)Info.Linkage));
     if (IsDefined) {
-      OS << ", scope: " << formatv("{0:8}", jitlink::getScopeName(Info.Scope))
+      OS << ", scope: " << formatv("{0:8}", GetLinkageName((uint8_t)Info.Scope))
          << ", " << (Info.IsLive ? "live" : "dead");
       if (Info.IsCallable)
         OS << ", callable";
@@ -114,13 +117,12 @@ static cl::opt<bool> SortSections("print-cas-object-sort-sections",
                                   cl::desc("Sort sections before printing"),
                                   cl::init(false));
 
-Error casobjectformats::printCASObject(const reader::CASObjectReader &Reader,
-                                       raw_ostream &OS, bool omitCASID) {
+Error casobjectformats::printCASObject(
+    const reader::CASObjectReader &Reader, raw_ostream &OS, bool omitCASID,
+    std::function<const char *(uint8_t)> GetEdgeName,
+    std::function<const char *(uint8_t)> GetScopeName,
+    std::function<const char *(uint8_t)> GetLinkageName) {
   Triple TT = Reader.getTargetTriple();
-  auto EdgeKindNameFn = jitlink::getGetEdgeKindNameFunction(TT);
-  if (auto E = EdgeKindNameFn.takeError())
-    return E;
-
   OS << "Triple: " << TT.str() << "\n\n";
 
   struct PrintBlock;
@@ -223,7 +225,8 @@ Error casobjectformats::printCASObject(const reader::CASObjectReader &Reader,
       raw_string_ostream(PrintSymbol->Name)
           << "<anon-" << (AnonNameIdx++) << '>';
     }
-    PrintSymbol->Description = getDescription(PrintSymbol->Name, Info);
+    PrintSymbol->Description =
+        getDescription(PrintSymbol->Name, Info, GetScopeName, GetLinkageName);
     if (Info.BlockRef) {
       auto PrintBlock = recordBlock(*Info.BlockRef);
       if (!PrintBlock)
@@ -267,7 +270,7 @@ Error casobjectformats::printCASObject(const reader::CASObjectReader &Reader,
             Target = *PrintSym;
           }
           std::string FixupDesc =
-              getDescription(Fixup, Target->Name, *EdgeKindNameFn);
+              getDescription(Fixup, Target->Name, GetEdgeName);
           PBlock.Fixups.push_back(PrintBlock::Fixup{std::move(FixupDesc)});
           return Error::success();
         });
