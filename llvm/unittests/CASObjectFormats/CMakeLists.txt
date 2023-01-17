@@ -3,6 +3,7 @@ set(LLVM_LINK_COMPONENTS
   CASObjectFormats
   JITLink
   Support
+  TargetParser
   )
 
 add_llvm_unittest(CASObjectFormatsTests

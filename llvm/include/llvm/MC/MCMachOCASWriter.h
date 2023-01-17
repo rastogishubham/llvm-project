@@ -12,6 +12,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/BinaryFormat/MachO.h"
+#include "llvm/CAS/ObjectStore.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCMachObjectWriter.h"
 #include "llvm/MC/MCObjectWriter.h"
@@ -136,6 +137,13 @@ private:
   MachObjectWriter MOW;
 
   uint64_t OSOffset = 0;
+
+  std::function<const cas::ObjectProxy(
+      llvm::MachOCASWriter &, llvm::MCAssembler &, const llvm::MCAsmLayout &,
+      cas::ObjectStore &, raw_ostream *)>
+      CreateFromMcAssembler = nullptr;
+  std::function<Error(cas::ObjectProxy, raw_ostream &)> SerializeObjectFile =
+      nullptr;
 };
 
 /// Construct a new Mach-O CAS writer instance.

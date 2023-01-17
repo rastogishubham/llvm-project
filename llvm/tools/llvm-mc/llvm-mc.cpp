@@ -28,6 +28,7 @@
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/MCTargetOptionsCommandFlags.h"
 #include "llvm/MC/TargetRegistry.h"
+#include "llvm/MCCAS/MCCASObjectV1.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compression.h"
 #include "llvm/Support/FileUtilities.h"
@@ -600,10 +601,33 @@ int main(int argc, char **argv) {
 
     MCCodeEmitter *CE = TheTarget->createMCCodeEmitter(*MCII, Ctx);
     MCAsmBackend *MAB = TheTarget->createMCAsmBackend(*STI, *MRI, MCOptions);
+    std::unique_ptr<MCObjectWriter> CASBackendWriter;
+    if (UseCASBackend) {
+      std::function<const cas::ObjectProxy(
+          llvm::MachOCASWriter &, llvm::MCAssembler &,
+          const llvm::MCAsmLayout &, cas::ObjectStore &, raw_ostream *)>
+          CreateFromMcAssembler =
+              [](llvm::MachOCASWriter &Writer, llvm::MCAssembler &Asm,
+                 const llvm::MCAsmLayout &Layout, cas::ObjectStore &CAS,
+                 raw_ostream *DebugOS = nullptr) -> const cas::ObjectProxy {
+        auto Schema = std::make_unique<mccasformats::v1::MCSchema>(CAS);
+        return cantFail(
+            Schema->createFromMCAssembler(Writer, Asm, Layout, DebugOS));
+      };
+      std::function<Error(cas::ObjectProxy, cas::ObjectStore &, raw_ostream &)>
+          SerializeObjectFile = [](cas::ObjectProxy RootNode,
+                                   cas::ObjectStore &CAS,
+                                   raw_ostream &OS) -> Error {
+        auto Schema = std::make_unique<mccasformats::v1::MCSchema>(CAS);
+        return Schema->serializeObjectFile(RootNode, OS);
+      };
+      CASBackendWriter = MAB->createCASObjectWriter(
+          *OS, TheTriple, *CAS, MCOptions, MCCASBackendMode,
+          CreateFromMcAssembler, SerializeObjectFile);
+    }
     Str.reset(TheTarget->createMCObjectStreamer(
         TheTriple, Ctx, std::unique_ptr<MCAsmBackend>(MAB),
-        UseCASBackend ? MAB->createCASObjectWriter(*OS, TheTriple, *CAS,
-                                                   MCOptions, MCCASBackendMode)
+        UseCASBackend ? std::move(CASBackendWriter)
         : DwoOut      ? MAB->createDwoObjectWriter(*OS, DwoOut->os())
                       : MAB->createObjectWriter(*OS),
         std::unique_ptr<MCCodeEmitter>(CE), *STI, MCOptions.MCRelaxAll,

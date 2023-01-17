@@ -5,6 +5,7 @@ set(LLVM_LINK_COMPONENTS
   FrontendOpenMP
   Support
   TargetParser
+  CAS
   )
 
 

@@ -7,6 +7,7 @@ set(LLVM_LINK_COMPONENTS
   Support
   TargetParser
   TextAPI
+  CASUtil
   ${LLVM_TARGETS_TO_BUILD}
   )
 

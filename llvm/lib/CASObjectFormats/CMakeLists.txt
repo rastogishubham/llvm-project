@@ -16,4 +16,5 @@ add_llvm_component_library(LLVMCASObjectFormats
   Support
   CAS
   JITLink
+  TargetParser
 )

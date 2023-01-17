@@ -56,13 +56,12 @@ MachOCASWriter::MachOCASWriter(
 uint64_t MachOCASWriter::writeObject(MCAssembler &Asm,
                                      const MCAsmLayout &Layout) {
   uint64_t StartOffset = OS.tell();
-  auto Schema = std::make_unique<v1::MCSchema>(CAS);
-  auto CASObj = cantFail(Schema->createFromMCAssembler(*this, Asm, Layout));
+  auto CASObj = CreateFromMcAssembler(*this, Asm, Layout, CAS, nullptr);
 
   auto VerifyObject = [&]() -> Error {
     SmallString<512> ObjectBuffer;
     raw_svector_ostream ObjectOS(ObjectBuffer);
-    if (auto E = Schema->serializeObjectFile(CASObj, ObjectOS))
+    if (auto E = SerializeObjectFile(CASObj, ObjectOS))
       return E;
 
     if (!ObjectBuffer.equals(InternalBuffer))
@@ -87,7 +86,7 @@ uint64_t MachOCASWriter::writeObject(MCAssembler &Asm,
     writeCASIDBuffer(CASObj.getID(), OS);
     break;
   case CASBackendMode::Native: {
-    auto E = Schema->serializeObjectFile(CASObj, OS);
+    auto E = SerializeObjectFile(CASObj, OS);
     if (E)
       report_fatal_error(std::move(E));
     break;
@@ -95,7 +94,7 @@ uint64_t MachOCASWriter::writeObject(MCAssembler &Asm,
   case CASBackendMode::Verify: {
     SmallString<512> ObjectBuffer;
     raw_svector_ostream ObjectOS(ObjectBuffer);
-    auto E = Schema->serializeObjectFile(CASObj, ObjectOS);
+    auto E = SerializeObjectFile(CASObj, ObjectOS);
     if (E)
       report_fatal_error(std::move(E));
 

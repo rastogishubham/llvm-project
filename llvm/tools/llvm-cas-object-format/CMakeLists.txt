@@ -5,6 +5,7 @@ set(LLVM_LINK_COMPONENTS
   CASObjectFormats
   RemoteCachingService
   MCCAS
+  CASUtil
   )
 
 add_llvm_tool(llvm-cas-object-format

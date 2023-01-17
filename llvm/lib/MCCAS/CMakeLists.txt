@@ -12,4 +12,5 @@ add_llvm_component_library(LLVMMCCAS
   CAS
   DebugInfoCodeView
   DebugInfoDWARF
+  MC
   )

@@ -60,7 +60,13 @@ MCAsmBackend::createObjectWriter(raw_pwrite_stream &OS) const {
 
 std::unique_ptr<MCObjectWriter> MCAsmBackend::createCASObjectWriter(
     raw_pwrite_stream &OS, const Triple &TT, cas::ObjectStore &CAS,
-    const MCTargetOptions &MCOpts, CASBackendMode Mode) const {
+    const MCTargetOptions &MCOpts, CASBackendMode Mode,
+    std::function<Expected<cas::ObjectProxy>(
+        llvm::MachOCASWriter &, llvm::MCAssembler &, const llvm::MCAsmLayout &,
+        cas::ObjectStore &, raw_ostream *)>
+        CreateFromMcAssembler,
+    std::function<Error(cas::ObjectProxy, cas::ObjectStore &, raw_ostream &)>
+        SerializeObjectFile) const {
   auto TW = createObjectTargetWriter();
   switch (TW->getFormat()) {
   case Triple::MachO:

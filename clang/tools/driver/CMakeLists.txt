@@ -18,6 +18,10 @@ set( LLVM_LINK_COMPONENTS
   TargetParser
   TransformUtils
   Vectorize
+  MCCAS
+  CASUtil
+  RemoteCachingService
+  RemoteNullService
   )
 
 # Support plugins.

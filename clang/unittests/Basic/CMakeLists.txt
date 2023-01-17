@@ -1,5 +1,6 @@
 set(LLVM_LINK_COMPONENTS
   Support
+  CAS
   )
 
 add_clang_unittest(BasicTests

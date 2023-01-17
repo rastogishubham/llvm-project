@@ -4,6 +4,10 @@ set(LLVM_LINK_COMPONENTS
   CAS
   CASObjectFormats
   MCCAS
+  CASUtil
+  BinaryFormat
+  TargetParser
+  Object
   )
 
 add_llvm_tool(llvm-cas-dump

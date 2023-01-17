@@ -12,6 +12,8 @@ set(LLVM_LINK_COMPONENTS
   MCDisassembler
   Support
   Target
+  CAS
+  RemoteNullService
   )
 
 set(SOURCES

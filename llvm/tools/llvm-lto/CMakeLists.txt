@@ -15,6 +15,9 @@ set(LLVM_LINK_COMPONENTS
   Support
   Target
   TargetParser
+  CAS
+  RemoteCachingService
+  RemoteNullService
   )
 
 add_llvm_tool(llvm-lto

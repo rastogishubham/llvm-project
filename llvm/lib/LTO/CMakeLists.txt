@@ -33,10 +33,10 @@ add_llvm_component_library(LLVMLTO
   Object
   Passes
   Remarks
-  RemoteCachingService
   Scalar
   Support
   Target
   TargetParser
   TransformUtils
+  RemoteCachingService
 )
