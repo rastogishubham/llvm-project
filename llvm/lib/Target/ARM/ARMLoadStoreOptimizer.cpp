@@ -2173,9 +2173,9 @@ namespace {
                           Register &BaseReg, int &Offset, Register &PredReg,
                           ARMCC::CondCodes &Pred, bool &isT2);
     bool RescheduleOps(MachineBasicBlock *MBB,
-                       SmallVectorImpl<MachineInstr *> &Ops,
-                       unsigned Base, bool isLd,
-                       DenseMap<MachineInstr*, unsigned> &MI2LocMap);
+                       SmallVectorImpl<MachineInstr *> &Ops, unsigned Base,
+                       bool isLd, DenseMap<MachineInstr *, unsigned> &MI2LocMap,
+                       DenseMap<Register, MachineInstr *> &RegisterMap);
     bool RescheduleLoadStoreInstrs(MachineBasicBlock *MBB);
     bool DistributeIncrements();
     bool DistributeIncrements(Register Base);
@@ -2324,10 +2324,10 @@ bool ARMPreAllocLoadStoreOpt::CanFormLdStDWord(
   return true;
 }
 
-bool ARMPreAllocLoadStoreOpt::RescheduleOps(MachineBasicBlock *MBB,
-                                 SmallVectorImpl<MachineInstr *> &Ops,
-                                 unsigned Base, bool isLd,
-                                 DenseMap<MachineInstr*, unsigned> &MI2LocMap) {
+bool ARMPreAllocLoadStoreOpt::RescheduleOps(
+    MachineBasicBlock *MBB, SmallVectorImpl<MachineInstr *> &Ops, unsigned Base,
+    bool isLd, DenseMap<MachineInstr *, unsigned> &MI2LocMap,
+    DenseMap<Register, MachineInstr *> &RegisterMap) {
   bool RetVal = false;
 
   // Sort by offset (in reverse order).
@@ -2476,6 +2476,10 @@ bool ARMPreAllocLoadStoreOpt::RescheduleOps(MachineBasicBlock *MBB,
         } else {
           for (unsigned i = 0; i != NumMove; ++i) {
             MachineInstr *Op = Ops.pop_back_val();
+            if (isLd)
+              // We are moving loads, so we need to record the register that the
+              // load writes to, for DBG_VAL moving in the future.
+              RegisterMap[Op->getOperand(0).getReg()] = nullptr;
             MBB->splice(InsertPos, MBB, Op);
           }
         }
@@ -2501,6 +2505,7 @@ ARMPreAllocLoadStoreOpt::RescheduleLoadStoreInstrs(MachineBasicBlock *MBB) {
   Base2InstMap Base2StsMap;
   BaseVec LdBases;
   BaseVec StBases;
+  DenseMap<Register, MachineInstr *> RegisterMap;
 
   unsigned Loc = 0;
   MachineBasicBlock::iterator MBBI = MBB->begin();
@@ -2563,7 +2568,7 @@ ARMPreAllocLoadStoreOpt::RescheduleLoadStoreInstrs(MachineBasicBlock *MBB) {
       unsigned Base = LdBases[i];
       SmallVectorImpl<MachineInstr *> &Lds = Base2LdsMap[Base];
       if (Lds.size() > 1)
-        RetVal |= RescheduleOps(MBB, Lds, Base, true, MI2LocMap);
+        RetVal |= RescheduleOps(MBB, Lds, Base, true, MI2LocMap, RegisterMap);
     }
 
     // Re-schedule stores.
@@ -2571,7 +2576,7 @@ ARMPreAllocLoadStoreOpt::RescheduleLoadStoreInstrs(MachineBasicBlock *MBB) {
       unsigned Base = StBases[i];
       SmallVectorImpl<MachineInstr *> &Sts = Base2StsMap[Base];
       if (Sts.size() > 1)
-        RetVal |= RescheduleOps(MBB, Sts, Base, false, MI2LocMap);
+        RetVal |= RescheduleOps(MBB, Sts, Base, false, MI2LocMap, RegisterMap);
     }
 
     if (MBBI != E) {
@@ -2579,6 +2584,52 @@ ARMPreAllocLoadStoreOpt::RescheduleLoadStoreInstrs(MachineBasicBlock *MBB) {
       Base2StsMap.clear();
       LdBases.clear();
       StBases.clear();
+    }
+  }
+
+  // Reschedule DBG_VALs
+  MBBI = MBB->begin();
+  E = MBB->end();
+  DenseMap<const DILocalVariable *, MachineInstr *> LocalVarMap;
+  DenseMap<MachineInstr *, Register> InstrMap;
+  for (; MBBI != E; ++MBBI) {
+    MachineInstr &MI = *MBBI;
+    if (MI.isDebugInstr() && MI.isDebugValueLike()) {
+      auto Op = MI.getOperand(0);
+      auto *DbgVar = MI.getDebugVariable();
+      if (!DbgVar)
+        llvm_unreachable("A DBG_VAL must describe a variable");
+      if (Op.isReg() && RegisterMap.find(Op.getReg()) != RegisterMap.end()) {
+        RegisterMap[Op.getReg()] = &MI;
+        InstrMap[&MI] = Op.getReg();
+      }
+      // Check if DBG_VAL describes a variable which is also described by a
+      // different DBG_VAL in the LocalVarMap, if so, modify the DBG_VAL in
+      // LocalVarMap to use a $noreg and remove from LocalVarMap
+      if (LocalVarMap.find(DbgVar) != LocalVarMap.end()) {
+        auto *Instr = LocalVarMap[DbgVar];
+        if (InstrMap.find(Instr) != InstrMap.end()) {
+          RegisterMap[InstrMap[Instr]] = nullptr;
+          if (Instr->getOperand(0).isReg())
+            Instr->getOperand(0).setReg(0);
+        }
+      }
+      LocalVarMap[DbgVar] = &MI;
+    } else {
+      // If the first operand of a load matches with a DBG_VAL in LocalVarMap,
+      // then move that DBG_VAL to below the load.
+      auto Opc = MI.getOpcode();
+      if (isLoadSingle(Opc)) {
+        auto Reg = MI.getOperand(0).getReg();
+        if (RegisterMap.find(Reg) == RegisterMap.end() ||
+            RegisterMap[Reg] == nullptr)
+          continue;
+        auto *DbgVal = RegisterMap[Reg];
+        MachineBasicBlock::iterator InsertPos = MBBI;
+        InsertPos++;
+        MBB->splice(InsertPos, MBB, DbgVal);
+        MBBI++;
+      }
     }
   }
 
