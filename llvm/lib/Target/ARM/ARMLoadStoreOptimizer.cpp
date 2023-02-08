@@ -2588,6 +2588,7 @@ ARMPreAllocLoadStoreOpt::RescheduleLoadStoreInstrs(MachineBasicBlock *MBB) {
   }
 
   // Reschedule DBG_VALs
+  // TODO explain algorithm
   MBBI = MBB->begin();
   E = MBB->end();
   DenseMap<const DILocalVariable *, MachineInstr *> LocalVarMap;
@@ -2597,8 +2598,11 @@ ARMPreAllocLoadStoreOpt::RescheduleLoadStoreInstrs(MachineBasicBlock *MBB) {
     if (MI.isDebugInstr() && MI.isDebugValueLike()) {
       auto Op = MI.getOperand(0);
       auto *DbgVar = MI.getDebugVariable();
-      if (!DbgVar)
-        llvm_unreachable("A DBG_VAL must describe a variable");
+      assert(
+          !DbgVar &&
+          "A DBG_VAL must describe a variable"); // TODO: Check MIR verifier to
+                                                 // see if assert is needed
+      // TODO: Add a comment
       if (Op.isReg() && RegisterMap.find(Op.getReg()) != RegisterMap.end()) {
         RegisterMap[Op.getReg()] = &MI;
         InstrMap[&MI] = Op.getReg();
@@ -2606,8 +2610,9 @@ ARMPreAllocLoadStoreOpt::RescheduleLoadStoreInstrs(MachineBasicBlock *MBB) {
       // Check if DBG_VAL describes a variable which is also described by a
       // different DBG_VAL in the LocalVarMap, if so, modify the DBG_VAL in
       // LocalVarMap to use a $noreg and remove from LocalVarMap
+      // TODO: Explain why we are doing, not what we are doing
       if (LocalVarMap.find(DbgVar) != LocalVarMap.end()) {
-        auto *Instr = LocalVarMap[DbgVar];
+        auto *Instr = LocalVarMap[DbgVar]; // TODO: Switch to iterator usage
         if (InstrMap.find(Instr) != InstrMap.end()) {
           RegisterMap[InstrMap[Instr]] = nullptr;
           if (Instr->getOperand(0).isReg())
@@ -2616,7 +2621,7 @@ ARMPreAllocLoadStoreOpt::RescheduleLoadStoreInstrs(MachineBasicBlock *MBB) {
       }
       LocalVarMap[DbgVar] = &MI;
     } else {
-      // If the first operand of a load matches with a DBG_VAL in LocalVarMap,
+      // If the first operand of a load matches with a DBG_VAL in RegisterMap,
       // then move that DBG_VAL to below the load.
       auto Opc = MI.getOpcode();
       if (isLoadSingle(Opc)) {
