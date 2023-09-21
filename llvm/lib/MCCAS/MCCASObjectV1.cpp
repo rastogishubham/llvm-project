@@ -79,15 +79,24 @@ class AbbrevSetWriter;
 /// debug info.
 class InMemoryCASDWARFObject : public DWARFObject {
   ArrayRef<char> DebugAbbrevSection;
+  DWARFSection DebugStringOffsetsSection;
   bool IsLittleEndian;
 
 public:
-  InMemoryCASDWARFObject(ArrayRef<char> AbbrevContents, bool IsLittleEndian)
-      : DebugAbbrevSection(AbbrevContents), IsLittleEndian(IsLittleEndian) {}
+  InMemoryCASDWARFObject(ArrayRef<char> AbbrevContents,
+                         ArrayRef<char> StringOffsetsContents,
+                         bool IsLittleEndian)
+      : DebugAbbrevSection(AbbrevContents),
+        DebugStringOffsetsSection({toStringRef(StringOffsetsContents)}),
+        IsLittleEndian(IsLittleEndian) {}
   bool isLittleEndian() const override { return IsLittleEndian; }
 
   StringRef getAbbrevSection() const override {
     return toStringRef(DebugAbbrevSection);
+  }
+
+  const DWARFSection &getStrOffsetsSection() const override {
+    return DebugStringOffsetsSection;
   }
 
   std::optional<RelocAddrEntry> find(const DWARFSection &Sec,
@@ -103,12 +112,13 @@ public:
   /// unit.
   Error partitionCUData(ArrayRef<char> DebugInfoData, uint64_t AbbrevOffset,
                         DWARFContext *Ctx, MCCASBuilder &Builder,
-                        AbbrevSetWriter &AbbrevWriter);
+                        AbbrevSetWriter &AbbrevWriter, uint16_t DwarfVersion);
 };
 
 struct CUInfo {
   uint64_t CUSize;
   uint32_t AbbrevOffset;
+  uint16_t DwarfVersion;
 };
 static Expected<CUInfo> getAndSetDebugAbbrevOffsetAndSkip(
     MutableArrayRef<char> CUData, support::endianness Endian,
@@ -1411,7 +1421,8 @@ DwarfSectionsCache mccasformats::v1::getDwarfSections(MCAssembler &Asm) {
       Asm.getContext().getObjectFileInfo()->getDwarfInfoSection(),
       Asm.getContext().getObjectFileInfo()->getDwarfLineSection(),
       Asm.getContext().getObjectFileInfo()->getDwarfStrSection(),
-      Asm.getContext().getObjectFileInfo()->getDwarfAbbrevSection()};
+      Asm.getContext().getObjectFileInfo()->getDwarfAbbrevSection(),
+      Asm.getContext().getObjectFileInfo()->getDwarfStrOffSection()};
 }
 
 Error MCCASBuilder::prepare() {
@@ -1675,10 +1686,15 @@ getAndSetDebugAbbrevOffsetAndSkip(MutableArrayRef<char> CUData,
   if (auto E = Reader.readInteger(DwarfVersion))
     return std::move(E);
 
-  // TODO: Dwarf 5 has a different order for the next fields.
-  if (DwarfVersion != 4)
-    return createStringError(inconvertibleErrorCode(),
-                             "Expected Dwarf 4 input");
+  if (DwarfVersion >= 5) {
+    // From DWARF v5 section 7.5.1.1, read unit_type and address_size fields.
+    uint8_t UnitType;
+    if (auto E = Reader.readInteger(UnitType))
+      return std::move(E);
+    uint8_t AddressSize;
+    if (auto E = Reader.readInteger(AddressSize))
+      return std::move(E);
+  }
 
   // TODO: Handle Dwarf 64 format, which uses 8 bytes.
   size_t AbbrevPosition = Reader.getOffset();
@@ -1700,7 +1716,7 @@ getAndSetDebugAbbrevOffsetAndSkip(MutableArrayRef<char> CUData,
   if (auto E = Reader.skip(*Size))
     return std::move(E);
 
-  return CUInfo{Reader.getOffset(), AbbrevOffset};
+  return CUInfo{Reader.getOffset(), AbbrevOffset, DwarfVersion};
 }
 
 /// Given a list of MCFragments, return a vector with the concatenation of their
@@ -1740,6 +1756,7 @@ MCCASBuilder::splitDebugInfoSectionData(MutableArrayRef<char> DebugInfoData) {
       return Info.takeError();
     Split.SplitCUData.push_back(DebugInfoData.take_front(Info->CUSize));
     Split.AbbrevOffsets.push_back(Info->AbbrevOffset);
+    Split.DwarfVersions.push_back(Info->DwarfVersion);
     DebugInfoData = DebugInfoData.drop_front(Info->CUSize);
   }
 
@@ -1865,7 +1882,8 @@ Error InMemoryCASDWARFObject::partitionCUData(ArrayRef<char> DebugInfoData,
                                               uint64_t AbbrevOffset,
                                               DWARFContext *Ctx,
                                               MCCASBuilder &Builder,
-                                              AbbrevSetWriter &AbbrevWriter) {
+                                              AbbrevSetWriter &AbbrevWriter,
+                                              uint16_t DwarfVersion) {
   StringRef AbbrevSectionContribution =
       getAbbrevSection().drop_front(AbbrevOffset);
   DataExtractor Data(AbbrevSectionContribution, isLittleEndian(), 8);
@@ -1884,13 +1902,24 @@ Error InMemoryCASDWARFObject::partitionCUData(ArrayRef<char> DebugInfoData,
 
   DWARFDie CUDie = DCU.getUnitDIE(false);
   assert(CUDie);
-  // Copy 11 bytes which represents the 32-bit DWARF Header for DWARF4.
-  if (DebugInfoData.size() < Dwarf4HeaderSize32Bit)
-    return createStringError(inconvertibleErrorCode(),
-                             "DebugInfoData is too small, it doesn't even "
-                             "contain a 32-bit DWARF Header");
+  ArrayRef<char> HeaderData;
+  if (DwarfVersion >= 5) {
+    // Copy 12 bytes which represents the 32-bit DWARF Header for DWARF5.
+    if (DebugInfoData.size() < Dwarf5HeaderSize32Bit)
+      return createStringError(inconvertibleErrorCode(),
+                               "DebugInfoData is too small, it doesn't even "
+                               "contain a 32-bit DWARF5 Header");
 
-  ArrayRef<char> HeaderData = DebugInfoData.take_front(Dwarf4HeaderSize32Bit);
+    HeaderData = DebugInfoData.take_front(Dwarf5HeaderSize32Bit);
+  } else {
+    // Copy 11 bytes which represents the 32-bit DWARF Header for DWARF4.
+    if (DebugInfoData.size() < Dwarf4HeaderSize32Bit)
+      return createStringError(inconvertibleErrorCode(),
+                               "DebugInfoData is too small, it doesn't even "
+                               "contain a 32-bit DWARF4 Header");
+
+    HeaderData = DebugInfoData.take_front(Dwarf4HeaderSize32Bit);
+  }
   Expected<DIETopLevelRef> Converted =
       DIEToCASConverter(DebugInfoData, Builder)
           .convert(CUDie, HeaderData, AbbrevWriter);
@@ -1920,20 +1949,32 @@ Error MCCASBuilder::splitDebugInfoAndAbbrevSections() {
 
   Expected<SmallVector<char, 0>> FullAbbrevData =
       mergeMCFragmentContents(AbbrevFragmentList);
+
   if (!FullAbbrevData)
     return FullAbbrevData.takeError();
 
-  InMemoryCASDWARFObject CASObj(
-      *FullAbbrevData, Asm.getBackend().Endian == support::endianness::little);
+  const MCSection::FragmentListType &StringOffsetsFragmentList =
+      DwarfSections.StrOffsets->getFragmentList();
+
+  Expected<SmallVector<char, 0>> FullStringOffsetsData =
+      mergeMCFragmentContents(StringOffsetsFragmentList);
+
+  if (!FullStringOffsetsData)
+    return FullStringOffsetsData.takeError();
+
+  InMemoryCASDWARFObject CASObj(*FullAbbrevData, *FullStringOffsetsData,
+                                Asm.getBackend().Endian ==
+                                    support::endianness::little);
   auto DWARFObj = std::make_unique<InMemoryCASDWARFObject>(CASObj);
   auto DWARFContextHolder = std::make_unique<DWARFContext>(std::move(DWARFObj));
   auto *DWARFCtx = DWARFContextHolder.get();
 
   AbbrevSetWriter AbbrevWriter;
-  for (auto [CUData, AbbrevOffset] :
-       llvm::zip(SplitInfo->SplitCUData, SplitInfo->AbbrevOffsets)) {
+  for (auto [CUData, AbbrevOffset, DwarfVersion] :
+       llvm::zip(SplitInfo->SplitCUData, SplitInfo->AbbrevOffsets,
+                 SplitInfo->DwarfVersions)) {
     if (auto E = CASObj.partitionCUData(CUData, AbbrevOffset, DWARFCtx, *this,
-                                        AbbrevWriter))
+                                        AbbrevWriter, DwarfVersion))
       return E;
   }
   return Error::success();
@@ -3064,7 +3105,22 @@ Error mccasformats::v1::visitDebugInfo(
   StringRef DistinctData = LoadedTopRef->DistinctData.getData();
   BinaryStreamReader DistinctReader(DistinctData, support::endianness::little);
   ArrayRef<char> HeaderData;
-  if (auto E = DistinctReader.readArray(HeaderData, Dwarf4HeaderSize32Bit))
+
+  auto BeginOffset = DistinctReader.getOffset();
+  auto Size = getSizeFromDwarfHeader(DistinctReader);
+  if (!Size)
+    return Size.takeError();
+
+  // 2-byte Dwarf version identifier.
+  uint16_t DwarfVersion;
+  if (auto E = DistinctReader.readInteger(DwarfVersion))
+    return E;
+
+  DistinctReader.setOffset(BeginOffset);
+
+  if (auto E = DistinctReader.readArray(
+          HeaderData,
+          DwarfVersion >= 5 ? Dwarf5HeaderSize32Bit : Dwarf4HeaderSize32Bit))
     return E;
   HeaderCallback(toStringRef(HeaderData));
 
