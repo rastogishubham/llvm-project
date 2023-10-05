@@ -2130,6 +2130,8 @@ Error MCCASBuilder::createDebugStrSection() {
   startSection(DwarfSections.Str);
   for (auto DebugStringRef : *DebugStringRefs)
     addNode(DebugStringRef);
+  if (auto E = createPaddingRef(DwarfSections.Str))
+    return E;
   return finalizeSection<DebugStringSectionRef>();
 }
 
