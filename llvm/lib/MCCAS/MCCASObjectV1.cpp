@@ -498,7 +498,7 @@ static Error materializeDebugInfoOpt(MCCASReader &Reader,
   };
 
   auto StartTagCallback = [&](dwarf::Tag, uint64_t AbbrevIdx) {
-    encodeULEB128(decodeAbbrevIndexAsDwarfAbbrevIdx(AbbrevIdx), *SectionStream);
+    encodeULEB128(AbbrevIdx, *SectionStream);
   };
 
   auto AttrCallback = [&](dwarf::Attribute, dwarf::Form Form,
@@ -1893,7 +1893,9 @@ struct DIEDataWriter : public DataWriter {
 
   /// Saves the main data stream and any children to a new DIEDataRef node.
   Expected<DIEDataRef> getCASNode(MCCASBuilder &CASBuilder) {
-    return DIEDataRef::create(CASBuilder, Children, Data);
+    auto Ref = DIEDataRef::create(CASBuilder, Children, Data);
+    Data.clear();
+    return Ref;
   }
 
 private:
@@ -1973,13 +1975,15 @@ private:
   ArrayRef<char> DebugInfoData;
   MCCASBuilder &CASBuilder;
 
-  Expected<DIEDataRef> convertInNewDIEBlock(DWARFDie DIE,
-                                            DistinctDataWriter &DistinctWriter,
-                                            AbbrevSetWriter &AbbrevWriter);
+  Expected<DIEDataRef>
+  convertInNewDIEBlock(DWARFDie DIE, DistinctDataWriter &DistinctWriter,
+                       AbbrevSetWriter &AbbrevWriter,
+                       SmallVectorImpl<cas::ObjectRef> &DIERefs);
 
   Error convertImpl(DWARFDie &DIE, DIEDataWriter &DIEWriter,
                     DistinctDataWriter &DistinctWriter,
-                    AbbrevSetWriter &AbbrevWriter);
+                    AbbrevSetWriter &AbbrevWriter,
+                    SmallVectorImpl<cas::ObjectRef> &DIERefs);
 };
 
 Error InMemoryCASDWARFObject::partitionCUData(ArrayRef<char> DebugInfoData,
@@ -2026,6 +2030,7 @@ Error InMemoryCASDWARFObject::partitionCUData(ArrayRef<char> DebugInfoData,
 
     HeaderData = DebugInfoData.take_front(Dwarf4HeaderSize32Bit);
   }
+
   Expected<DIETopLevelRef> Converted =
       DIEToCASConverter(DebugInfoData, Builder)
           .convert(CUDie, HeaderData, AbbrevWriter);
@@ -3000,7 +3005,8 @@ static void writeDIEAttrs(DWARFDie &DIE, ArrayRef<char> DebugInfoData,
 /// according to the corresponding DIEAbbrevRefs block.
 Error DIEToCASConverter::convertImpl(DWARFDie &DIE, DIEDataWriter &DIEWriter,
                                      DistinctDataWriter &DistinctWriter,
-                                     AbbrevSetWriter &AbbrevWriter) {
+                                     AbbrevSetWriter &AbbrevWriter,
+                                     SmallVectorImpl<cas::ObjectRef> &DIERefs) {
   Expected<unsigned> MaybeAbbrevIndex =
       AbbrevWriter.createAbbrevEntry(DIE, CASBuilder);
   if (!MaybeAbbrevIndex)
@@ -3016,30 +3022,25 @@ Error DIEToCASConverter::convertImpl(DWARFDie &DIE, DIEDataWriter &DIEWriter,
       DistinctWriter.writeULEB128(getEndOfDIESiblingsMarker());
       break;
     }
-
-    // FIXME: don't use recursion.
     if (shouldCreateSeparateBlockFor(Child)) {
-      DistinctWriter.writeULEB128(getDIEInAnotherBlockMarker());
-      auto MaybeNode =
-          convertInNewDIEBlock(Child, DistinctWriter, AbbrevWriter);
-      if (!MaybeNode)
-        return MaybeNode.takeError();
-      DIEWriter.addRef(*MaybeNode);
-      continue;
+      auto Ref = DIEWriter.getCASNode(CASBuilder);
+      if (!Ref)
+        return Ref.takeError();
+      DIERefs.push_back(Ref->getRef());
     }
-
-    if (auto E = convertImpl(Child, DIEWriter, DistinctWriter, AbbrevWriter))
+    if (auto E = convertImpl(Child, DIEWriter, DistinctWriter, AbbrevWriter,
+                             DIERefs))
       return E;
   }
   return Error::success();
 }
 
-Expected<DIEDataRef>
-DIEToCASConverter::convertInNewDIEBlock(DWARFDie DIE,
-                                        DistinctDataWriter &DistinctWriter,
-                                        AbbrevSetWriter &AbbrevWriter) {
+Expected<DIEDataRef> DIEToCASConverter::convertInNewDIEBlock(
+    DWARFDie DIE, DistinctDataWriter &DistinctWriter,
+    AbbrevSetWriter &AbbrevWriter, SmallVectorImpl<cas::ObjectRef> &DIERefs) {
   DIEDataWriter DIEWriter;
-  if (auto E = convertImpl(DIE, DIEWriter, DistinctWriter, AbbrevWriter))
+  if (auto E =
+          convertImpl(DIE, DIEWriter, DistinctWriter, AbbrevWriter, DIERefs))
     return std::move(E);
   return DIEWriter.getCASNode(CASBuilder);
 }
@@ -3049,8 +3050,9 @@ DIEToCASConverter::convert(DWARFDie DIE, ArrayRef<char> HeaderData,
                            AbbrevSetWriter &AbbrevWriter) {
   DistinctDataWriter DistinctWriter;
   DistinctWriter.writeData(HeaderData);
+  SmallVector<cas::ObjectRef> DIERefs;
   Expected<DIEDataRef> MaybeDIE =
-      convertInNewDIEBlock(DIE, DistinctWriter, AbbrevWriter);
+      convertInNewDIEBlock(DIE, DistinctWriter, AbbrevWriter, DIERefs);
   if (!MaybeDIE)
     return MaybeDIE.takeError();
   Expected<DIEAbbrevSetRef> MaybeAbbrevSet =
@@ -3061,8 +3063,12 @@ DIEToCASConverter::convert(DWARFDie DIE, ArrayRef<char> HeaderData,
       DistinctWriter.getCASNode(CASBuilder);
   if (!MaybeDistinct)
     return MaybeDistinct.takeError();
+  DIERefs.push_back(MaybeDIE->getRef());
+  auto TopDIERef = DIEDedupeTopLevelRef::create(CASBuilder, DIERefs);
+  if (!TopDIERef)
+    return TopDIERef.takeError();
   SmallVector<cas::ObjectRef, 3> Refs{
-      MaybeDIE->getRef(), MaybeAbbrevSet->getRef(), MaybeDistinct->getRef()};
+      TopDIERef->getRef(), MaybeAbbrevSet->getRef(), MaybeDistinct->getRef()};
   return DIETopLevelRef::create(CASBuilder, Refs);
 }
 
@@ -3074,8 +3080,8 @@ mccasformats::v1::loadDIETopLevel(DIETopLevelRef TopLevelRef) {
         "TopLevelRef is expected to have three references");
 
   const MCSchema &Schema = TopLevelRef.getSchema();
-  Expected<DIEDataRef> RootDIE =
-      DIEDataRef::get(Schema, TopLevelRef.getReference(0));
+  Expected<DIEDedupeTopLevelRef> RootDIE =
+      DIEDedupeTopLevelRef::get(Schema, TopLevelRef.getReference(0));
   Expected<DIEAbbrevSetRef> AbbrevSet =
       DIEAbbrevSetRef::get(Schema, TopLevelRef.getReference(1));
   Expected<DIEDistinctDataRef> DistinctData =
@@ -3097,9 +3103,8 @@ mccasformats::v1::loadDIETopLevel(DIETopLevelRef TopLevelRef) {
 }
 
 struct DIEVisitor {
-  Error visitDIERef(DIEDataRef Ref);
-  Error visitDIERef(BinaryStreamReader &DataReader, unsigned AbbrevIdx,
-                    StringRef DIEData, ArrayRef<DIEDataRef> &DIEChildrenStack);
+  Error visitDIERef(DIEDedupeTopLevelRef Ref);
+  Error visitDIERef(unsigned AbbrevIdx, ArrayRef<DIEDataRef> &DIEChildrenStack);
   Error visitDIEAttrs(AbbrevEntryReader &AbbrevReader,
                       BinaryStreamReader &Reader, StringRef DIEData);
 
@@ -3165,56 +3170,67 @@ static AbbrevEntryReader getAbbrevEntryReader(ArrayRef<StringRef> AbbrevEntries,
   return AbbrevEntryReader(AbbrevData);
 }
 
-Error DIEVisitor::visitDIERef(BinaryStreamReader &DataReader,
-                              unsigned AbbrevIdx, StringRef DIEData,
+Error DIEVisitor::visitDIERef(unsigned AbbrevIdx,
                               ArrayRef<DIEDataRef> &DIEChildrenStack) {
-  AbbrevEntryReader AbbrevReader =
-      getAbbrevEntryReader(AbbrevEntries, AbbrevIdx);
 
-  if (Expected<dwarf::Tag> MaybeTag = AbbrevReader.readTag())
-    StartTagCallback(*MaybeTag, AbbrevIdx);
-  else
-    return MaybeTag.takeError();
-
-  Expected<bool> MaybeHasChildren = AbbrevReader.readHasChildren();
-  if (!MaybeHasChildren)
-    return MaybeHasChildren.takeError();
-
-  if (auto E = visitDIEAttrs(AbbrevReader, DataReader, DIEData))
-    return E;
-
-  if (!*MaybeHasChildren) {
-    EndTagCallback(false /*HadChildren*/);
-    return Error::success();
-  }
-
+  uint64_t Off = 0;
   while (true) {
-    Expected<uint64_t> ChildAbbrevIdx = readAbbrevIdx(DistinctReader);
-    if (!ChildAbbrevIdx)
-      return ChildAbbrevIdx.takeError();
+    auto Data = DIEChildrenStack.empty() ? StringRef()
+                                         : DIEChildrenStack.front().getData();
+    BinaryStreamReader Reader(Data, llvm::endianness::little);
+    Reader.setOffset(Off);
 
-    if (*ChildAbbrevIdx == getEndOfDIESiblingsMarker())
-      break;
+    AbbrevEntryReader AbbrevReader =
+        getAbbrevEntryReader(AbbrevEntries, AbbrevIdx);
 
-    if (*ChildAbbrevIdx == getDIEInAnotherBlockMarker()) {
-      if (auto E = visitDIERef(DIEChildrenStack.front()))
-        return E;
-      DIEChildrenStack = DIEChildrenStack.drop_front();
-      continue;
-    }
+    if (Expected<dwarf::Tag> MaybeTag = AbbrevReader.readTag())
+      StartTagCallback(*MaybeTag, AbbrevIdx);
+    else
+      return MaybeTag.takeError();
 
-    if (auto E =
-            visitDIERef(DataReader, *ChildAbbrevIdx, DIEData, DIEChildrenStack))
+    Expected<bool> MaybeHasChildren = AbbrevReader.readHasChildren();
+    if (!MaybeHasChildren)
+      return MaybeHasChildren.takeError();
+
+    if (auto E = visitDIEAttrs(AbbrevReader, Reader, Data))
       return E;
-  }
 
-  EndTagCallback(true /*HadChildren*/);
+    Off = Reader.getOffset();
+
+    if (!*MaybeHasChildren)
+      EndTagCallback(false /*HadChildren*/);
+
+    while (true) {
+      auto NextAbbrevIdx = readAbbrevIdx(DistinctReader);
+
+      if (!NextAbbrevIdx)
+        return NextAbbrevIdx.takeError();
+
+      if (*NextAbbrevIdx == getEndOfDIESiblingsMarker()) {
+        EndTagCallback(true /*HadChildren*/);
+        if (DistinctReader.empty())
+          break;
+        continue;
+      }
+      if (Reader.empty() && !DIEChildrenStack.empty()) {
+        DIEChildrenStack = DIEChildrenStack.drop_front();
+        if (!DIEChildrenStack.empty())
+          NewBlockCallback(DIEChildrenStack.front().getID().toString());
+
+        Off = 0;
+        AbbrevIdx = *NextAbbrevIdx;
+        break;
+      }
+      AbbrevIdx = *NextAbbrevIdx;
+      break;
+    }
+    if (DistinctReader.empty())
+      break;
+  }
   return Error::success();
 }
 
-Error DIEVisitor::visitDIERef(DIEDataRef StartDIERef) {
-  StringRef DIEData = StartDIERef.getData();
-  BinaryStreamReader DataReader(DIEData, endianness::little);
+Error DIEVisitor::visitDIERef(DIEDedupeTopLevelRef StartDIERef) {
 
   Expected<uint64_t> MaybeAbbrevIdx = readAbbrevIdx(DistinctReader);
   if (!MaybeAbbrevIdx)
@@ -3223,8 +3239,7 @@ Error DIEVisitor::visitDIERef(DIEDataRef StartDIERef) {
 
   // The tag of a fresh block must be meaningful, otherwise we wouldn't have
   // made a new block.
-  assert(AbbrevIdx != getEndOfDIESiblingsMarker() &&
-         AbbrevIdx != getDIEInAnotherBlockMarker());
+  assert(AbbrevIdx != getEndOfDIESiblingsMarker());
 
   NewBlockCallback(StartDIERef.getID().toString());
 
@@ -3234,7 +3249,7 @@ Error DIEVisitor::visitDIERef(DIEDataRef StartDIERef) {
     return MaybeChildren.takeError();
   ArrayRef<DIEDataRef> Children = *MaybeChildren;
 
-  return visitDIERef(DataReader, AbbrevIdx, DIEData, Children);
+  return visitDIERef(AbbrevIdx, Children);
 }
 
 Error mccasformats::v1::visitDebugInfo(

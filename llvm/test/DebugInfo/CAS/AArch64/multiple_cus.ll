@@ -12,7 +12,7 @@
 ; DUMP-NEXT:       mc:debug_DIE_top_level llvmcas://{{.*}} 
 ; DUMP-NEXT:       Header = [8A 0 0 0 4 0 0 0 0 0 8]
 ; DUMP-NEXT:       CAS Block: llvmcas://{{.*}}
-; DUMP-NEXT:       DW_TAG_compile_unit       AbbrevIdx = 2
+; DUMP-NEXT:       DW_TAG_compile_unit       AbbrevIdx = 1
 ; DUMP-NEXT:         DW_AT_producer                 DW_FORM_strp_cas           [distinct] [0]
 ; DUMP-NEXT:         DW_AT_language                 DW_FORM_data2              [dedups]   [21 0]
 ; DUMP-NEXT:         DW_AT_name                     DW_FORM_strp_cas           [distinct] [66]
@@ -22,7 +22,7 @@
 ; DUMP-NEXT:         DW_AT_low_pc                   DW_FORM_addr               [distinct] [0 0 0 0 0 0 0 0]
 ; DUMP-NEXT:         DW_AT_high_pc                  DW_FORM_data4              [dedups]   [30 0 0 0]
 ; DUMP-NEXT:         CAS Block: llvmcas://{{.*}}
-; DUMP-NEXT:         DW_TAG_subprogram         AbbrevIdx = 3
+; DUMP-NEXT:         DW_TAG_subprogram         AbbrevIdx = 2
 ; DUMP-NEXT:           DW_AT_low_pc                   DW_FORM_addr               [distinct] [0 0 0 0 0 0 0 0]
 ; DUMP-NEXT:           DW_AT_high_pc                  DW_FORM_data4              [dedups]   [18 0 0 0]
 ; DUMP-NEXT:           DW_AT_APPLE_omit_frame_ptr     DW_FORM_flag_present       [dedups]   []
@@ -33,14 +33,14 @@
 ; DUMP-NEXT:           DW_AT_decl_line                DW_FORM_data1              [dedups]   [2]
 ; DUMP-NEXT:           DW_AT_type                     DW_FORM_ref4_cas           [distinct] [86 1]
 ; DUMP-NEXT:           DW_AT_external                 DW_FORM_flag_present       [dedups]   []
-; DUMP-NEXT:           DW_TAG_formal_parameter   AbbrevIdx = 4
+; DUMP-NEXT:           DW_TAG_formal_parameter   AbbrevIdx = 3
 ; DUMP-NEXT:             DW_AT_location                 DW_FORM_exprloc            [dedups]   [2 91 C]
 ; DUMP-NEXT:             DW_AT_name                     DW_FORM_strp_cas           [distinct] [BD 2]
 ; DUMP-NEXT:             DW_AT_decl_file                DW_FORM_data1              [distinct] [1]
 ; DUMP-NEXT:             DW_AT_decl_line                DW_FORM_data1              [dedups]   [2]
 ; DUMP-NEXT:             DW_AT_type                     DW_FORM_ref4_cas           [distinct] [86 1]
 ; DUMP-NEXT:         CAS Block: llvmcas://{{.*}}
-; DUMP-NEXT:         DW_TAG_subprogram         AbbrevIdx = 3
+; DUMP-NEXT:         DW_TAG_subprogram         AbbrevIdx = 2
 ; DUMP-NEXT:           DW_AT_low_pc                   DW_FORM_addr               [distinct] [18 0 0 0 0 0 0 0]
 ; DUMP-NEXT:           DW_AT_high_pc                  DW_FORM_data4              [dedups]   [18 0 0 0]
 ; DUMP-NEXT:           DW_AT_APPLE_omit_frame_ptr     DW_FORM_flag_present       [dedups]   []
@@ -51,20 +51,20 @@
 ; DUMP-NEXT:           DW_AT_decl_line                DW_FORM_data1              [dedups]   [6]
 ; DUMP-NEXT:           DW_AT_type                     DW_FORM_ref4_cas           [distinct] [86 1]
 ; DUMP-NEXT:           DW_AT_external                 DW_FORM_flag_present       [dedups]   []
-; DUMP-NEXT:           DW_TAG_formal_parameter   AbbrevIdx = 4
+; DUMP-NEXT:           DW_TAG_formal_parameter   AbbrevIdx = 3
 ; DUMP-NEXT:             DW_AT_location                 DW_FORM_exprloc            [dedups]   [2 91 C]
 ; DUMP-NEXT:             DW_AT_name                     DW_FORM_strp_cas           [distinct] [BF 2]
 ; DUMP-NEXT:             DW_AT_decl_file                DW_FORM_data1              [distinct] [1]
 ; DUMP-NEXT:             DW_AT_decl_line                DW_FORM_data1              [dedups]   [6]
 ; DUMP-NEXT:             DW_AT_type                     DW_FORM_ref4_cas           [distinct] [86 1]
-; DUMP-NEXT:         DW_TAG_base_type          AbbrevIdx = 5
+; DUMP-NEXT:         DW_TAG_base_type          AbbrevIdx = 4
 ; DUMP-NEXT:           DW_AT_name                     DW_FORM_strp_cas           [distinct] [B3 2]
 ; DUMP-NEXT:           DW_AT_encoding                 DW_FORM_data1              [dedups]   [5]
 ; DUMP-NEXT:           DW_AT_byte_size                DW_FORM_data1              [dedups]   [4]
 ; DUMP-NEXT:       mc:debug_DIE_top_level llvmcas://{{.*}} 
 ; DUMP-NEXT:       Header = [8A 0 0 0 4 0 0 0 0 0 8]
 ; DUMP-NEXT:       CAS Block: llvmcas://{{.*}}
-; DUMP-NEXT:       DW_TAG_compile_unit       AbbrevIdx = 6
+; DUMP-NEXT:       DW_TAG_compile_unit       AbbrevIdx = 5
 ; DUMP-NEXT:         DW_AT_producer                 DW_FORM_strp_cas           [distinct] [0]
 ; DUMP-NEXT:         DW_AT_language                 DW_FORM_data2              [dedups]   [21 0]
 ; DUMP-NEXT:         DW_AT_name                     DW_FORM_strp_cas           [distinct] [EA 1]
@@ -75,7 +75,7 @@
 ; DUMP-NEXT:         DW_AT_low_pc                   DW_FORM_addr               [distinct] [30 0 0 0 0 0 0 0]
 ; DUMP-NEXT:         DW_AT_high_pc                  DW_FORM_data4              [dedups]   [38 0 0 0]
 ; DUMP-NEXT:         CAS Block: llvmcas://{{.*}}
-; DUMP-NEXT:         DW_TAG_subprogram         AbbrevIdx = 3
+; DUMP-NEXT:         DW_TAG_subprogram         AbbrevIdx = 2
 ; DUMP-NEXT:           DW_AT_low_pc                   DW_FORM_addr               [distinct] [30 0 0 0 0 0 0 0]
 ; DUMP-NEXT:           DW_AT_high_pc                  DW_FORM_data4              [dedups]   [1C 0 0 0]
 ; DUMP-NEXT:           DW_AT_APPLE_omit_frame_ptr     DW_FORM_flag_present       [dedups]   []
@@ -86,14 +86,14 @@
 ; DUMP-NEXT:           DW_AT_decl_line                DW_FORM_data1              [dedups]   [1]
 ; DUMP-NEXT:           DW_AT_type                     DW_FORM_ref4_cas           [distinct] [86 1]
 ; DUMP-NEXT:           DW_AT_external                 DW_FORM_flag_present       [dedups]   []
-; DUMP-NEXT:           DW_TAG_formal_parameter   AbbrevIdx = 4
+; DUMP-NEXT:           DW_TAG_formal_parameter   AbbrevIdx = 3
 ; DUMP-NEXT:             DW_AT_location                 DW_FORM_exprloc            [dedups]   [2 91 C]
 ; DUMP-NEXT:             DW_AT_name                     DW_FORM_strp_cas           [distinct] [BD 2]
 ; DUMP-NEXT:             DW_AT_decl_file                DW_FORM_data1              [distinct] [1]
 ; DUMP-NEXT:             DW_AT_decl_line                DW_FORM_data1              [dedups]   [1]
 ; DUMP-NEXT:             DW_AT_type                     DW_FORM_ref4_cas           [distinct] [86 1]
 ; DUMP-NEXT:         CAS Block: llvmcas://{{.*}}
-; DUMP-NEXT:         DW_TAG_subprogram         AbbrevIdx = 3
+; DUMP-NEXT:         DW_TAG_subprogram         AbbrevIdx = 2
 ; DUMP-NEXT:           DW_AT_low_pc                   DW_FORM_addr               [distinct] [4C 0 0 0 0 0 0 0]
 ; DUMP-NEXT:           DW_AT_high_pc                  DW_FORM_data4              [dedups]   [1C 0 0 0]
 ; DUMP-NEXT:           DW_AT_APPLE_omit_frame_ptr     DW_FORM_flag_present       [dedups]   []
@@ -104,13 +104,13 @@
 ; DUMP-NEXT:           DW_AT_decl_line                DW_FORM_data1              [dedups]   [5]
 ; DUMP-NEXT:           DW_AT_type                     DW_FORM_ref4_cas           [distinct] [86 1]
 ; DUMP-NEXT:           DW_AT_external                 DW_FORM_flag_present       [dedups]   []
-; DUMP-NEXT:           DW_TAG_formal_parameter   AbbrevIdx = 4
+; DUMP-NEXT:           DW_TAG_formal_parameter   AbbrevIdx = 3
 ; DUMP-NEXT:             DW_AT_location                 DW_FORM_exprloc            [dedups]   [2 91 C]
 ; DUMP-NEXT:             DW_AT_name                     DW_FORM_strp_cas           [distinct] [BF 2]
 ; DUMP-NEXT:             DW_AT_decl_file                DW_FORM_data1              [distinct] [1]
 ; DUMP-NEXT:             DW_AT_decl_line                DW_FORM_data1              [dedups]   [5]
 ; DUMP-NEXT:             DW_AT_type                     DW_FORM_ref4_cas           [distinct] [86 1]
-; DUMP-NEXT:         DW_TAG_base_type          AbbrevIdx = 5
+; DUMP-NEXT:         DW_TAG_base_type          AbbrevIdx = 4
 ; DUMP-NEXT:           DW_AT_name                     DW_FORM_strp_cas           [distinct] [B7 2]
 ; DUMP-NEXT:           DW_AT_encoding                 DW_FORM_data1              [dedups]   [4]
 ; DUMP-NEXT:           DW_AT_byte_size                DW_FORM_data1              [dedups]   [4]

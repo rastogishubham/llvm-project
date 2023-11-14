@@ -35,29 +35,14 @@ Expected<uint64_t> getFormSize(dwarf::Form Form, dwarf::FormParams FP,
 /// A special value to indicate the end of a sequence of sibling DIEs.
 inline uint16_t getEndOfDIESiblingsMarker() { return 0; }
 
-/// A special value to indicate that a DIE has been placed in a separate CAS
-/// block.
-inline uint16_t getDIEInAnotherBlockMarker() { return 1; }
-
 /// Converts an index into the abbreviation table into a value that can be
 /// written to the CAS.
-inline uint64_t encodeAbbrevIndex(uint64_t Index) { return Index + 2; }
+inline uint64_t encodeAbbrevIndex(uint64_t Index) { return Index + 1; }
 
 /// Decodes a value written to the CAS as an index into the abbreviation set's
 /// list of CAS references.
 inline uint64_t decodeAbbrevIndexAsAbbrevSetIdx(uint64_t Index) {
-  assert(Index != getEndOfDIESiblingsMarker() &&
-         Index != getDIEInAnotherBlockMarker());
-  return Index - 2;
-}
-
-/// Decodes a value written to the CAS as an index into DWARF's abbreviation
-/// table.
-inline uint64_t decodeAbbrevIndexAsDwarfAbbrevIdx(uint64_t Index) {
-  assert(Index != getEndOfDIESiblingsMarker() &&
-         Index != getDIEInAnotherBlockMarker());
-  // Dwarf 5: Section 7.5.3:
-  // the abbreviation code 0 is reserved for null debugging information entries.
+  assert(Index != getEndOfDIESiblingsMarker());
   return Index - 1;
 }
 
