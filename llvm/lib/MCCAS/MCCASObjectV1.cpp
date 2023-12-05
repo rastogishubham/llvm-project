@@ -3108,6 +3108,22 @@ struct DIEVisitor {
   Error visitDIEAttrs(AbbrevEntryReader &AbbrevReader,
                       BinaryStreamReader &Reader, StringRef DIEData);
 
+  struct AbbrevDIEContents {
+    dwarf::Attribute Attr;
+    dwarf::Form Form;
+    bool FormInDistinctData;
+    bool FormSizeRequiresDIEContents;
+    uint8_t FormSize;
+  };
+
+  struct AbbrevDIETagAndChildren {
+    dwarf::Tag Tag;
+    bool HasChildren;
+  };
+
+  SmallVector<
+      std::pair<AbbrevDIETagAndChildren, SmallVector<AbbrevDIEContents>>>
+      AbbrevDIECache;
   ArrayRef<StringRef> AbbrevEntries;
   BinaryStreamReader DistinctReader;
   StringRef DistinctData;
