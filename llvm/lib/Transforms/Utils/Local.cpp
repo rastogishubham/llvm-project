@@ -2230,6 +2230,8 @@ template <typename T> static void salvageDbgAssignAddress(T *Assign) {
   assert(!SalvagedExpr->getFragmentInfo().has_value() &&
          "address-expression shouldn't have fragment info");
 
+  SalvagedExpr = SalvagedExpr->foldConstantMath();
+
   // Salvage succeeds if no additional values are required.
   if (AdditionalValues.empty()) {
     Assign->setAddress(NewV);
@@ -2285,6 +2287,7 @@ void llvm::salvageDebugInfoForDbgValues(
           DIExpression::appendOpsToArg(SalvagedExpr, Ops, LocNo, StackValue);
       LocItr = std::find(++LocItr, DIILocation.end(), &I);
     }
+    SalvagedExpr = SalvagedExpr->foldConstantMath();
     // salvageDebugInfoImpl should fail on examining the first element of
     // DbgUsers, or none of them.
     if (!Op0)
@@ -2346,6 +2349,7 @@ void llvm::salvageDebugInfoForDbgValues(
           DIExpression::appendOpsToArg(SalvagedExpr, Ops, LocNo, StackValue);
       LocItr = std::find(++LocItr, DVRLocation.end(), &I);
     }
+    SalvagedExpr = SalvagedExpr->foldConstantMath();
     // salvageDebugInfoImpl should fail on examining the first element of
     // DbgUsers, or none of them.
     if (!Op0)
