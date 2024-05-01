@@ -2233,6 +2233,12 @@ template <typename T> static void salvageDbgAssignAddress(T *Assign) {
   assert(!SalvagedExpr->getFragmentInfo().has_value() &&
          "address-expression shouldn't have fragment info");
 
+  SmallVector<uint64_t> OpsToBeFolded;
+  OpsToBeFolded.append(SalvagedExpr->expr_op_begin(),
+                       SalvagedExpr->expr_op_end());
+  OpsToBeFolded = SalvagedExpr->foldConstantMath(OpsToBeFolded);
+  SalvagedExpr = DIExpression::get(SalvagedExpr->getContext(), OpsToBeFolded);
+
   // Salvage succeeds if no additional values are required.
   if (AdditionalValues.empty()) {
     Assign->setAddress(NewV);
@@ -2290,6 +2296,11 @@ void llvm::salvageDebugInfoForDbgValues(
                                                   StackValue, !SalvagedBinOp);
       LocItr = std::find(++LocItr, DIILocation.end(), &I);
     }
+    SmallVector<uint64_t> OpsToBeFolded;
+    OpsToBeFolded.append(SalvagedExpr->expr_op_begin(),
+                         SalvagedExpr->expr_op_end());
+    OpsToBeFolded = SalvagedExpr->foldConstantMath(OpsToBeFolded);
+    SalvagedExpr = DIExpression::get(SalvagedExpr->getContext(), OpsToBeFolded);
     // salvageDebugInfoImpl should fail on examining the first element of
     // DbgUsers, or none of them.
     if (!Op0)
@@ -2353,6 +2364,11 @@ void llvm::salvageDebugInfoForDbgValues(
                                                   StackValue, !SalvagedBinOp);
       LocItr = std::find(++LocItr, DVRLocation.end(), &I);
     }
+    SmallVector<uint64_t> OpsToBeFolded;
+    OpsToBeFolded.append(SalvagedExpr->expr_op_begin(),
+                         SalvagedExpr->expr_op_end());
+    OpsToBeFolded = SalvagedExpr->foldConstantMath(OpsToBeFolded);
+    SalvagedExpr = DIExpression::get(SalvagedExpr->getContext(), OpsToBeFolded);
     // salvageDebugInfoImpl should fail on examining the first element of
     // DbgUsers, or none of them.
     if (!Op0)
