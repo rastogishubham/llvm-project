@@ -338,8 +338,7 @@ void salvageDebugInfoForDbgValues(Instruction &I,
 ///   AdditionalValues = %b
 Value *salvageDebugInfoImpl(Instruction &I, uint64_t CurrentLocOps,
                             SmallVectorImpl<uint64_t> &Ops,
-                            SmallVectorImpl<Value *> &AdditionalValues,
-                            bool &SalvagedBinOp);
+                            SmallVectorImpl<Value *> &AdditionalValues);
 
 /// Point debug users of \p From to \p To or salvage them. Use this function
 /// only when replacing all uses of \p From with \p To, with a guarantee that

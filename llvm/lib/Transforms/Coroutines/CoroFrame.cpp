@@ -2867,18 +2867,16 @@ salvageDebugInfoImpl(SmallDenseMap<Argument *, AllocaInst *, 4> &ArgToAllocaMap,
     } else {
       SmallVector<uint64_t, 16> Ops;
       SmallVector<Value *, 0> AdditionalValues;
-      bool SalvagedBinOp = false;
       Value *Op = llvm::salvageDebugInfoImpl(
           *Inst, Expr ? Expr->getNumLocationOperands() : 0, Ops,
-          AdditionalValues, SalvagedBinOp);
+          AdditionalValues);
       if (!Op || !AdditionalValues.empty()) {
         // If salvaging failed or salvaging produced more than one location
         // operand, give up.
         break;
       }
       Storage = Op;
-      Expr = DIExpression::appendOpsToArg(Expr, Ops, 0, /*StackValue*/ false,
-                                          !SalvagedBinOp);
+      Expr = DIExpression::appendOpsToArg(Expr, Ops, 0, /*StackValue*/ false);
     }
     SkipOutermostLoad = false;
   }
