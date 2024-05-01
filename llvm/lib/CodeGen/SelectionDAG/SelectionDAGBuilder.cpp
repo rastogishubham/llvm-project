@@ -1522,9 +1522,10 @@ void SelectionDAGBuilder::salvageUnresolvedDbgValue(const Value *V,
     // Temporary "0", awaiting real implementation.
     SmallVector<uint64_t, 16> Ops;
     SmallVector<Value *, 4> AdditionalValues;
+    bool SalvagedBinOp = false;
     V = salvageDebugInfoImpl(const_cast<Instruction &>(VAsInst),
                              Expr->getNumLocationOperands(), Ops,
-                             AdditionalValues);
+                             AdditionalValues, SalvagedBinOp);
     // If we cannot salvage any further, and haven't yet found a suitable debug
     // expression, bail out.
     if (!V)
@@ -1537,7 +1538,8 @@ void SelectionDAGBuilder::salvageUnresolvedDbgValue(const Value *V,
       break;
 
     // New value and expr now represent this debuginfo.
-    Expr = DIExpression::appendOpsToArg(Expr, Ops, 0, StackValue);
+    Expr =
+        DIExpression::appendOpsToArg(Expr, Ops, 0, StackValue, !SalvagedBinOp);
 
     // Some kind of simplification occurred: check whether the operand of the
     // salvaged debug expression can be encoded in this DAG.

@@ -2219,14 +2219,17 @@ template <typename T> static void salvageDbgAssignAddress(T *Assign) {
   uint64_t CurrentLocOps = 0;
   SmallVector<Value *, 4> AdditionalValues;
   SmallVector<uint64_t, 16> Ops;
-  Value *NewV = salvageDebugInfoImpl(*I, CurrentLocOps, Ops, AdditionalValues);
+  bool SalvagedBinOp = false;
+  Value *NewV = salvageDebugInfoImpl(*I, CurrentLocOps, Ops, AdditionalValues,
+                                     SalvagedBinOp);
 
   // Check if the salvage failed.
   if (!NewV)
     return;
 
-  DIExpression *SalvagedExpr = DIExpression::appendOpsToArg(
-      Assign->getAddressExpression(), Ops, 0, /*StackValue=*/false);
+  DIExpression *SalvagedExpr =
+      DIExpression::appendOpsToArg(Assign->getAddressExpression(), Ops, 0,
+                                   /*StackValue=*/false, !SalvagedBinOp);
   assert(!SalvagedExpr->getFragmentInfo().has_value() &&
          "address-expression shouldn't have fragment info");
 
@@ -2278,11 +2281,13 @@ void llvm::salvageDebugInfoForDbgValues(
       SmallVector<uint64_t, 16> Ops;
       unsigned LocNo = std::distance(DIILocation.begin(), LocItr);
       uint64_t CurrentLocOps = SalvagedExpr->getNumLocationOperands();
-      Op0 = salvageDebugInfoImpl(I, CurrentLocOps, Ops, AdditionalValues);
+      bool SalvagedBinOp = false;
+      Op0 = salvageDebugInfoImpl(I, CurrentLocOps, Ops, AdditionalValues,
+                                 SalvagedBinOp);
       if (!Op0)
         break;
-      SalvagedExpr =
-          DIExpression::appendOpsToArg(SalvagedExpr, Ops, LocNo, StackValue);
+      SalvagedExpr = DIExpression::appendOpsToArg(SalvagedExpr, Ops, LocNo,
+                                                  StackValue, !SalvagedBinOp);
       LocItr = std::find(++LocItr, DIILocation.end(), &I);
     }
     // salvageDebugInfoImpl should fail on examining the first element of
@@ -2339,11 +2344,13 @@ void llvm::salvageDebugInfoForDbgValues(
       SmallVector<uint64_t, 16> Ops;
       unsigned LocNo = std::distance(DVRLocation.begin(), LocItr);
       uint64_t CurrentLocOps = SalvagedExpr->getNumLocationOperands();
-      Op0 = salvageDebugInfoImpl(I, CurrentLocOps, Ops, AdditionalValues);
+      bool SalvagedBinOp = false;
+      Op0 = salvageDebugInfoImpl(I, CurrentLocOps, Ops, AdditionalValues,
+                                 SalvagedBinOp);
       if (!Op0)
         break;
-      SalvagedExpr =
-          DIExpression::appendOpsToArg(SalvagedExpr, Ops, LocNo, StackValue);
+      SalvagedExpr = DIExpression::appendOpsToArg(SalvagedExpr, Ops, LocNo,
+                                                  StackValue, !SalvagedBinOp);
       LocItr = std::find(++LocItr, DVRLocation.end(), &I);
     }
     // salvageDebugInfoImpl should fail on examining the first element of
@@ -2540,7 +2547,8 @@ Value *getSalvageOpsForIcmpOp(ICmpInst *Icmp, uint64_t CurrentLocOps,
 
 Value *llvm::salvageDebugInfoImpl(Instruction &I, uint64_t CurrentLocOps,
                                   SmallVectorImpl<uint64_t> &Ops,
-                                  SmallVectorImpl<Value *> &AdditionalValues) {
+                                  SmallVectorImpl<Value *> &AdditionalValues,
+                                  bool &SalvagedBinOp) {
   auto &M = *I.getModule();
   auto &DL = M.getDataLayout();
 
@@ -2575,8 +2583,10 @@ Value *llvm::salvageDebugInfoImpl(Instruction &I, uint64_t CurrentLocOps,
 
   if (auto *GEP = dyn_cast<GetElementPtrInst>(&I))
     return getSalvageOpsForGEP(GEP, DL, CurrentLocOps, Ops, AdditionalValues);
-  if (auto *BI = dyn_cast<BinaryOperator>(&I))
+  if (auto *BI = dyn_cast<BinaryOperator>(&I)) {
+    SalvagedBinOp = true;
     return getSalvageOpsForBinOp(BI, CurrentLocOps, Ops, AdditionalValues);
+  }
   if (auto *IC = dyn_cast<ICmpInst>(&I))
     return getSalvageOpsForIcmpOp(IC, CurrentLocOps, Ops, AdditionalValues);
 

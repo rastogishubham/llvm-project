@@ -3040,7 +3040,8 @@ public:
   /// location.
   static DIExpression *appendOpsToArg(const DIExpression *Expr,
                                       ArrayRef<uint64_t> Ops, unsigned ArgNo,
-                                      bool StackValue = false);
+                                      bool StackValue = false,
+                                      bool SkipFolding = false);
 
   /// Create a copy of \p Expr with each instance of
   /// `DW_OP_LLVM_arg, \p OldArg` replaced with `DW_OP_LLVM_arg, \p NewArg`,
