@@ -35,9 +35,11 @@
 ; CHECK: _Z3barv
 ; CHECK: %[[RESULT:.*]] = call i32 @_Z3foov
 ; CHECK: llvm.dbg.value(metadata i32 %[[RESULT]], metadata [[METADATA_IDX1:![0-9]+]]
+; CHECK: llvm.dbg.value(metadata i32 %[[RESULT]], metadata [[METADATA_IDX2:![0-9]+]]
 ; CHECK: ret
 ; CHECK: DICompileUnit
-; CHECK: [[METADATA_IDX1]] = !DILocalVariable(name: "result"
+; CHECK: [[METADATA_IDX2]] = !DILocalVariable(name: "result"
+; CHECK: [[METADATA_IDX1]] = !DILocalVariable(name: "this"
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"

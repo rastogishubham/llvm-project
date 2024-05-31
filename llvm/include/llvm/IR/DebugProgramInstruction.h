@@ -426,6 +426,11 @@ public:
   /// Does this describe the address of a local variable. True for dbg.addr
   /// and dbg.declare, but not dbg.value, which describes its value.
   bool isAddressOfVariable() const { return Type == LocationType::Declare; }
+
+  /// Does this describe the value of a local variable. False for dbg.addr
+  /// and dbg.declare, but not True dbg.value, which describes its value.
+  bool isValueOfVariable() const { return Type == LocationType::Value; }
+
   LocationType getType() const { return Type; }
 
   void setKillLocation();

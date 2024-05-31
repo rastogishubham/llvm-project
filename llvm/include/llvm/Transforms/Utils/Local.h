@@ -259,6 +259,13 @@ CallInst *changeToCall(InvokeInst *II, DomTreeUpdater *DTU = nullptr);
 ///  Dbg Intrinsic utilities
 ///
 
+/// Moves an llvm.dbg.value intrinsic before a store to an alloca'd value
+/// that has an associated llvm.dbg.value intrinsic.
+void MoveDebugValueToStoreLoc(DbgVariableRecord *DVR, StoreInst *SI,
+                              DIBuilder &Builder);
+void MoveDebugValueToStoreLoc(DbgVariableIntrinsic *DII, StoreInst *SI,
+                              DIBuilder &Builder);
+
 /// Inserts a llvm.dbg.value intrinsic before a store to an alloca'd value
 /// that has an associated llvm.dbg.declare intrinsic.
 void ConvertDebugDeclareToDebugValue(DbgVariableIntrinsic *DII,

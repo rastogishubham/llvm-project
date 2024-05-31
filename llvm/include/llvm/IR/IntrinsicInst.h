@@ -341,6 +341,13 @@ public:
     return getIntrinsicID() == Intrinsic::dbg_declare;
   }
 
+  /// Does this describe the value of a local variable. True for dbg.value,
+  /// but not dbg.declare, which describes its address, or dbg.assign, which
+  /// describes a combination of the variable's value and address.
+  bool isValueOfVariable() const {
+    return getIntrinsicID() == Intrinsic::dbg_value;
+  }
+
   void setKillLocation() {
     // TODO: When/if we remove duplicate values from DIArgLists, we don't need
     // this set anymore.
