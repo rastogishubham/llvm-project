@@ -97,6 +97,24 @@ TinyPtrVector<DbgVariableRecord *> llvm::findDVRValues(Value *V) {
   return Values;
 }
 
+TinyPtrVector<DbgVariableRecord *> llvm::findDVRDeclaresAndValues(Value *V) {
+  // This function is hot. Check whether the value has any metadata to avoid a
+  // DenseMap lookup. This check is a bitfield datamember lookup.
+  if (!V->isUsedByMetadata())
+    return {};
+  auto *L = LocalAsMetadata::getIfExists(V);
+  if (!L)
+    return {};
+
+  TinyPtrVector<DbgVariableRecord *> DeclaresAndValues;
+  for (DbgVariableRecord *DVR : L->getAllDbgVariableRecordUsers())
+    if (DVR->isValueOfVariable() ||
+        DVR->getType() == DbgVariableRecord::LocationType::Declare)
+      DeclaresAndValues.push_back(DVR);
+
+  return DeclaresAndValues;
+}
+
 template <typename IntrinsicT, bool DbgAssignAndValuesOnly>
 static void
 findDbgIntrinsics(SmallVectorImpl<IntrinsicT *> &Result, Value *V,

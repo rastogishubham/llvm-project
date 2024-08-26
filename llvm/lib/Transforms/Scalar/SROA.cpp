@@ -5395,8 +5395,9 @@ bool SROA::splitAlloca(AllocaInst &AI, AllocaSlices &AS) {
           OldDII->eraseFromParent();
       };
       for_each(findDbgDeclares(Fragment.Alloca), RemoveOne);
-      for_each(findDVRDeclares(Fragment.Alloca), RemoveOne);
-      for_each(findDVRValues(Fragment.Alloca), RemoveOne);
+      // for_each(findDVRDeclares(Fragment.Alloca), RemoveOne);
+      // for_each(findDVRValues(Fragment.Alloca), RemoveOne);
+      for_each(findDVRDeclaresAndValues(Fragment.Alloca), RemoveOne);
       insertNewDbgInst(DIB, DbgVariable, Fragment.Alloca, NewExpr, &AI,
                        NewDbgFragment, BitExtractOffset);
     }
@@ -5405,8 +5406,9 @@ bool SROA::splitAlloca(AllocaInst &AI, AllocaSlices &AS) {
   // Migrate debug information from the old alloca to the new alloca(s)
   // and the individual partitions.
   for_each(findDbgDeclares(&AI), MigrateOne);
-  for_each(findDVRDeclares(&AI), MigrateOne);
-  for_each(findDVRValues(&AI), MigrateOne);
+  // for_each(findDVRDeclares(&AI), MigrateOne);
+  // for_each(findDVRValues(&AI), MigrateOne);
+  for_each(findDVRDeclaresAndValues(&AI), MigrateOne);
   for_each(at::getAssignmentMarkers(&AI), MigrateOne);
   for_each(at::getDVRAssignmentMarkers(&AI), MigrateOne);
 

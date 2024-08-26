@@ -46,6 +46,8 @@ TinyPtrVector<DbgVariableRecord *> findDVRDeclares(Value *V);
 /// As above, for DVRValues.
 TinyPtrVector<DbgVariableRecord *> findDVRValues(Value *V);
 
+TinyPtrVector<DbgVariableRecord *> findDVRDeclaresAndValues(Value *V);
+
 /// Finds the llvm.dbg.value intrinsics describing a value.
 void findDbgValues(
     SmallVectorImpl<DbgValueInst *> &DbgValues, Value *V,
