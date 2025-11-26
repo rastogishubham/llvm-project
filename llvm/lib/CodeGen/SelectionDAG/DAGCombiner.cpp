@@ -14457,7 +14457,7 @@ static SDValue tryToFoldExtOfLoad(SelectionDAG &DAG, DAGCombiner &Combiner,
   // have to add a DW_OP_LLVM_fragment to the DIExpression.
   auto SalvageToOldLoadSize = [&](SDValue From, SDValue To64) {
     for (SDDbgValue *Dbg : DAG.GetDbgValues(From.getNode())) {
-  //     unsigned VarBits = From->getValueSizeInBits(0);
+      unsigned VarBits = From->getValueSizeInBits(0);
 
   //     // Build/append a fragment expression [0, VarBits]
   //     const DIExpression *OldE = Dbg->getExpression();
