@@ -14460,7 +14460,7 @@ static SDValue tryToFoldExtOfLoad(SelectionDAG &DAG, DAGCombiner &Combiner,
       unsigned VarBits = From->getValueSizeInBits(0);
 
   //     // Build/append a fragment expression [0, VarBits]
-  //     const DIExpression *OldE = Dbg->getExpression();
+      const DIExpression *OldE = Dbg->getExpression();
   //     DIExpression *NewE = DIExpression::append(
   //         OldE, {dwarf::DW_OP_LLVM_fragment, /*OffsetBits=*/0, VarBits});
 
