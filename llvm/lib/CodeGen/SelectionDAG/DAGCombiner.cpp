@@ -14466,9 +14466,9 @@ static SDValue tryToFoldExtOfLoad(SelectionDAG &DAG, DAGCombiner &Combiner,
 
   //     // Create a new SDDbgValue that points at the widened node with the
   //     // fragment.
-  //     SDDbgValue *NewDV = DAG.getDbgValue(
-  //         Dbg->getVariable(), NewE, To64.getNode(), To64.getResNo(),
-  //         Dbg->isIndirect(), Dbg->getDebugLoc(), Dbg->getOrder());
+      SDDbgValue *NewDV = DAG.getDbgValue(
+          Dbg->getVariable(), NewE, To64.getNode(), To64.getResNo(),
+          Dbg->isIndirect(), Dbg->getDebugLoc(), Dbg->getOrder());
   //     DAG.AddDbgValue(NewDV, /*isParametet*/ false);
     }
   };
