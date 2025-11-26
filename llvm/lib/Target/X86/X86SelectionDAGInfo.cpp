@@ -67,6 +67,7 @@ bool X86SelectionDAGInfo::isBaseRegConflictPossible(
 
   const X86RegisterInfo *TRI = static_cast<const X86RegisterInfo *>(
       DAG.getSubtarget().getRegisterInfo());
+      
   return llvm::is_contained(ClobberSet, TRI->getBaseRegister());
 }
 
