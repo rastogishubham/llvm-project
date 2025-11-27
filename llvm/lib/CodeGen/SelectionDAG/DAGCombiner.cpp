@@ -14455,29 +14455,29 @@ static SDValue tryToFoldExtOfLoad(SelectionDAG &DAG, DAGCombiner &Combiner,
   // Because we are replacing a load and a sext with a load-sext instruction,
   // the dbg_value attached to the load will be of a smaller bit width, and we
   // have to add a DW_OP_LLVM_fragment to the DIExpression.
-  auto SalvageToOldLoadSize = [&](SDValue From, SDValue To64) {
-    for (SDDbgValue *Dbg : DAG.GetDbgValues(From.getNode())) {
-      unsigned VarBits = From->getValueSizeInBits(0);
+  // auto SalvageToOldLoadSize = [&](SDValue From, SDValue To64) {
+  //   for (SDDbgValue *Dbg : DAG.GetDbgValues(From.getNode())) {
+  //     unsigned VarBits = From->getValueSizeInBits(0);
 
-      // Build/append a fragment expression [0, VarBits]
-      const DIExpression *OldE = Dbg->getExpression();
-      auto NewE = DIExpression::createFragmentExpression(OldE, 0, VarBits);
+  //     // Build/append a fragment expression [0, VarBits]
+  //     const DIExpression *OldE = Dbg->getExpression();
+  //     auto NewE = DIExpression::createFragmentExpression(OldE, 0, VarBits);
 
-      // Create a new SDDbgValue that points at the widened node with the
-      // fragment.
-      if (!NewE)
-        continue;
-      SDDbgValue *NewDV = DAG.getDbgValue(
-          Dbg->getVariable(), *NewE, To64.getNode(), To64.getResNo(),
-          Dbg->isIndirect(), Dbg->getDebugLoc(), Dbg->getOrder());
-      DAG.AddDbgValue(NewDV, /*isParametet*/ false);
-    }
-  };
+  //     // Create a new SDDbgValue that points at the widened node with the
+  //     // fragment.
+  //     if (!NewE)
+  //       continue;
+  //     SDDbgValue *NewDV = DAG.getDbgValue(
+  //         Dbg->getVariable(), *NewE, To64.getNode(), To64.getResNo(),
+  //         Dbg->isIndirect(), Dbg->getDebugLoc(), Dbg->getOrder());
+  //     DAG.AddDbgValue(NewDV, /*isParametet*/ false);
+  //   }
+  // };
 
   if (NoReplaceTrunc) {
     if (LN0->getHasDebugValue()) {
       DAG.transferDbgValues(OldLoadVal, ExtLoad);
-      SalvageToOldLoadSize(OldLoadVal, ExtLoad);
+      // SalvageToOldLoadSize(OldLoadVal, ExtLoad);
     }
     if (N->getHasDebugValue())
       DAG.transferDbgValues(OldSextValue, ExtLoad);
@@ -14488,7 +14488,7 @@ static SDValue tryToFoldExtOfLoad(SelectionDAG &DAG, DAGCombiner &Combiner,
         DAG.getNode(ISD::TRUNCATE, SDLoc(N0), N0.getValueType(), ExtLoad);
     if (LN0->getHasDebugValue()) {
       DAG.transferDbgValues(OldLoadVal, Trunc);
-      SalvageToOldLoadSize(OldLoadVal, Trunc);
+      // SalvageToOldLoadSize(OldLoadVal, Trunc);
     }
     if (N->getHasDebugValue())
       DAG.transferDbgValues(OldSextValue, Trunc);
