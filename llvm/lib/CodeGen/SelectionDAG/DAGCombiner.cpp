@@ -14463,10 +14463,10 @@ static SDValue tryToFoldExtOfLoad(SelectionDAG &DAG, DAGCombiner &Combiner,
       const DIExpression *OldE = Dbg->getExpression();
       auto NewE = DIExpression::createFragmentExpression(OldE, 0, VarBits);
 
-      //     // Create a new SDDbgValue that points at the widened node with the
-      //     // fragment.
-      //     if (!NewE)
-      //       continue;
+      // Create a new SDDbgValue that points at the widened node with the
+      // fragment.
+      if (!NewE)
+        continue;
       //     SDDbgValue *NewDV = DAG.getDbgValue(
       //         Dbg->getVariable(), *NewE, To64.getNode(), To64.getResNo(),
       //         Dbg->isIndirect(), Dbg->getDebugLoc(), Dbg->getOrder());
