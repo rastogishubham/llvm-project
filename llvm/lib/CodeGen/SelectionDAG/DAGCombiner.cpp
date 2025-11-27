@@ -14461,8 +14461,7 @@ static SDValue tryToFoldExtOfLoad(SelectionDAG &DAG, DAGCombiner &Combiner,
 
       // Build/append a fragment expression [0, VarBits]
       const DIExpression *OldE = Dbg->getExpression();
-      //     auto NewE = DIExpression::createFragmentExpression(OldE, 0,
-      //     VarBits);
+      auto NewE = DIExpression::createFragmentExpression(OldE, 0, VarBits);
 
       //     // Create a new SDDbgValue that points at the widened node with the
       //     // fragment.
