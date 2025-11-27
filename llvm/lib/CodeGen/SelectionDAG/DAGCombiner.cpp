@@ -14459,8 +14459,8 @@ static SDValue tryToFoldExtOfLoad(SelectionDAG &DAG, DAGCombiner &Combiner,
     for (SDDbgValue *Dbg : DAG.GetDbgValues(From.getNode())) {
       unsigned VarBits = From->getValueSizeInBits(0);
 
-      //     // Build/append a fragment expression [0, VarBits]
-      //     const DIExpression *OldE = Dbg->getExpression();
+      // Build/append a fragment expression [0, VarBits]
+      const DIExpression *OldE = Dbg->getExpression();
       //     auto NewE = DIExpression::createFragmentExpression(OldE, 0,
       //     VarBits);
 
