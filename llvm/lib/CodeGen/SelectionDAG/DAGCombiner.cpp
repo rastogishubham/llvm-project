@@ -32,6 +32,7 @@
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/Analysis/VectorUtils.h"
+#include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/CodeGen/ByteProvider.h"
 #include "llvm/CodeGen/DAGCombine.h"
 #include "llvm/CodeGen/ISDOpcodes.h"
@@ -14445,29 +14446,35 @@ static SDValue tryToFoldExtOfLoad(SelectionDAG &DAG, DAGCombiner &Combiner,
                                    LN0->getBasePtr(), N0.getValueType(),
                                    LN0->getMemOperand());
   Combiner.ExtendSetCCUses(SetCCs, N0, ExtLoad, ExtOpc);
+  unsigned Opcode = N->getOpcode();
+  bool IsSigned = Opcode == ISD::SIGN_EXTEND ? true : false;
   // If the load value is used only by N, replace it via CombineTo N.
   SDValue OldLoadVal(LN0, 0);
-  SDValue OldSextValue(N, 0);
+  SDValue OldExtValue(N, 0);
   bool NoReplaceTrunc = OldLoadVal.hasOneUse();
   Combiner.CombineTo(N, ExtLoad);
 
   // Because we are replacing a load and a sext with a load-sext instruction,
   // the dbg_value attached to the load will be of a smaller bit width, and we
   // have to add a DW_OP_LLVM_fragment to the DIExpression.
-  auto SalvageToOldLoadSize = [&](SDValue From, SDValue To64) {
+  auto SalvageToOldLoadSize = [&](SDValue From, SDValue To, bool IsSigned) {
     for (SDDbgValue *Dbg : DAG.GetDbgValues(From.getNode())) {
-      unsigned VarBits = From->getValueSizeInBits(0);
+      unsigned VarBitsFrom = From->getValueSizeInBits(0);
+      unsigned VarBitsTo = To->getValueSizeInBits(0);
 
-      // Build/append a fragment expression [0, VarBits]
+      // Build a convert expression for the s|z extend.
       const DIExpression *OldE = Dbg->getExpression();
-      auto NewE = DIExpression::createFragmentExpression(OldE, 0, VarBits);
+      SmallVector<uint64_t, 8> Ops;
+      dwarf::TypeKind TK =
+          IsSigned ? dwarf::DW_ATE_signed : dwarf::DW_ATE_unsigned;
+      Ops.append({dwarf::DW_OP_LLVM_convert, VarBitsFrom, TK,
+                  dwarf::DW_OP_LLVM_convert, VarBitsTo, TK});
+      auto *NewE = DIExpression::get(OldE->getContext(), Ops);
 
-      // Create a new SDDbgValue that points at the widened node with the
-      // fragment.
-      if (!NewE)
-        continue;
+      // // Create a new SDDbgValue that points at the widened node with the
+      // // fragment.
       SDDbgValue *NewDV = DAG.getDbgValue(
-          Dbg->getVariable(), *NewE, To64.getNode(), To64.getResNo(),
+          Dbg->getVariable(), NewE, To.getNode(), To.getResNo(),
           Dbg->isIndirect(), Dbg->getDebugLoc(), Dbg->getOrder());
       DAG.AddDbgValue(NewDV, /*isParametet*/ false);
     }
@@ -14476,10 +14483,10 @@ static SDValue tryToFoldExtOfLoad(SelectionDAG &DAG, DAGCombiner &Combiner,
   if (NoReplaceTrunc) {
     if (LN0->getHasDebugValue()) {
       DAG.transferDbgValues(OldLoadVal, ExtLoad);
-      SalvageToOldLoadSize(OldLoadVal, ExtLoad);
+      SalvageToOldLoadSize(OldLoadVal, ExtLoad, IsSigned);
     }
     if (N->getHasDebugValue())
-      DAG.transferDbgValues(OldSextValue, ExtLoad);
+      DAG.transferDbgValues(OldExtValue, ExtLoad);
     DAG.ReplaceAllUsesOfValueWith(SDValue(LN0, 1), ExtLoad.getValue(1));
     Combiner.recursivelyDeleteUnusedNodes(LN0);
   } else {
@@ -14487,10 +14494,10 @@ static SDValue tryToFoldExtOfLoad(SelectionDAG &DAG, DAGCombiner &Combiner,
         DAG.getNode(ISD::TRUNCATE, SDLoc(N0), N0.getValueType(), ExtLoad);
     if (LN0->getHasDebugValue()) {
       DAG.transferDbgValues(OldLoadVal, Trunc);
-      SalvageToOldLoadSize(OldLoadVal, Trunc);
+      SalvageToOldLoadSize(OldLoadVal, Trunc, IsSigned);
     }
     if (N->getHasDebugValue())
-      DAG.transferDbgValues(OldSextValue, Trunc);
+      DAG.transferDbgValues(OldExtValue, Trunc);
     Combiner.CombineTo(LN0, Trunc, ExtLoad.getValue(1));
   }
   return SDValue(N, 0); // Return N so it doesn't get rechecked!

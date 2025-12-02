@@ -6,12 +6,12 @@
 
 # MIR: ![[IDX:[0-9]+]] = !DILocalVariable(name: "Idx"
 # MIR-LABEL: bb.0
-# MIR: %{{[0-9a-zA-Z]+}}{{.*}} = MOVSX64rm32 ${{.*}}, 1, $noreg, @GlobArr, $noreg, debug-instr-number [[INSTR_NUM:[0-9]+]]
+# MIR: %{{[0-9a-f]+}}{{.*}} = MOVSX64rm32 ${{.*}}, 1, $noreg, @GlobArr, $noreg, debug-instr-number [[INSTR_NUM:[0-9]+]]
 # MIR-NEXT: DBG_INSTR_REF ![[IDX]], !DIExpression(DW_OP_LLVM_arg, 0), dbg-instr-ref([[INSTR_NUM]], 0)
-# MIR-NEXT: DBG_INSTR_REF ![[IDX]], !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_fragment, 0, 32), dbg-instr-ref([[INSTR_NUM]], 0)
+# MIR-NEXT: DBG_INSTR_REF ![[IDX]], !DIExpression(DW_OP_LLVM_arg, 0,  DW_OP_LLVM_convert, 32, DW_ATE_signed, DW_OP_LLVM_convert, 64, DW_ATE_signed), dbg-instr-ref([[INSTR_NUM]], 0)
 
-# DUMP: DW_AT_location	(indexed ({{[0-9]+}}x{{[0-9]+}}) loclist = 0x{{[0-9]+}}: 
-# DUMP-NEXT: [0x{{[0-9]+}}, 0x{{[0-9]+}}): {{.*}}, DW_OP_piece 0x4
+# DUMP: DW_AT_location	(indexed ({{[0-9a-f]+}}x{{[0-9a-f]+}}) loclist = 0x{{[0-9]+}}: 
+# DUMP-NEXT: [0x{{[0-9a-f]+}}, 0x{{[0-9a-f]+}}): DW_OP_breg0 RAX+0, DW_OP_convert (0x{{[0-9a-f]+}}) "DW_ATE_signed_32", DW_OP_convert (0x{{[0-9a-f]+}}) "DW_ATE_signed_64")
 
 --- |
   @GlobArr = dso_local local_unnamed_addr global [5 x i32] [i32 1, i32 1, i32 2, i32 3, i32 5], align 16, !dbg !0
