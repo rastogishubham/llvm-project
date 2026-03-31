@@ -14848,8 +14848,6 @@ static SDValue tryToFoldExtOfLoad(SelectionDAG &DAG, DAGCombiner &Combiner,
                                   ISD::LoadExtType ExtLoadType,
                                   ISD::NodeType ExtOpc,
                                   bool NonNegZExt = false) {
-  unsigned Opcode_N = N->getOpcode();
-  bool IsSigned = Opcode_N == ISD::SIGN_EXTEND;
 
   bool Frozen = N0.getOpcode() == ISD::FREEZE;
   SDValue Freeze = Frozen ? N0 : SDValue();
@@ -14896,11 +14894,16 @@ static SDValue tryToFoldExtOfLoad(SelectionDAG &DAG, DAGCombiner &Combiner,
   SDLoc DL(Load);
 
   auto SalvageDbgValue = [&](SDDbgValue *Dbg, SDValue From, SDValue To,
-                             const DIExpression *NewExpr) {
+                             unsigned FromBits, unsigned ToBits,
+                             bool IsSigned) {
     SmallVector<SDDbgOperand> Locs = Dbg->copyLocationOps();
     bool Changed = false;
 
-    for (SDDbgOperand &Op : Locs) {
+    bool IsVariadic = Dbg->isVariadic();
+    SmallVector<unsigned, 2> AffectedArgs;
+
+    for (unsigned I = 0, E = Locs.size(); I != E; ++I) {
+      SDDbgOperand &Op = Locs[I];
       if (Op.getKind() != SDDbgOperand::SDNODE)
         continue;
 
@@ -14908,11 +14911,31 @@ static SDValue tryToFoldExtOfLoad(SelectionDAG &DAG, DAGCombiner &Combiner,
           Op.getResNo() == From.getResNo()) {
         Op = SDDbgOperand::fromNode(To.getNode(), To.getResNo());
         Changed = true;
+
+        if (IsVariadic)
+          AffectedArgs.push_back(I);
       }
     }
 
     if (!Changed)
       return;
+
+    const DIExpression *OldExpr = Dbg->getExpression();
+    const DIExpression *NewExpr = nullptr;
+
+    if (!IsVariadic) {
+      // Do not introduce DW_OP_LLVM_arg into ordinary single-location
+      // DBG_VALUEs.
+      NewExpr = DIExpression::appendExt(OldExpr, FromBits, ToBits, IsSigned);
+    } else {
+      auto ExtOps = DIExpression::getExtOps(FromBits, ToBits, IsSigned);
+
+      NewExpr = DIExpression::convertToVariadicExpression(OldExpr);
+
+      for (unsigned ArgNo : AffectedArgs)
+        NewExpr = DIExpression::appendOpsToArg(NewExpr, ExtOps, ArgNo,
+                                               /*StackValue=*/false);
+    }
 
     SDDbgValue *NewDV = DAG.getDbgValueList(
         Dbg->getVariable(), const_cast<DIExpression *>(NewExpr), Locs,
@@ -14940,11 +14963,7 @@ static SDValue tryToFoldExtOfLoad(SelectionDAG &DAG, DAGCombiner &Combiner,
       if (Dbg->isInvalidated())
         continue;
 
-      const DIExpression *OldE = Dbg->getExpression();
-      const DIExpression *NewE =
-          DIExpression::appendExt(OldE, VarBitsFrom, VarBitsTo, IsSigned);
-
-      SalvageDbgValue(Dbg, From, To, NewE);
+      SalvageDbgValue(Dbg, From, To, VarBitsFrom, VarBitsTo, IsSigned);
     }
   };
 
@@ -14961,6 +14980,8 @@ static SDValue tryToFoldExtOfLoad(SelectionDAG &DAG, DAGCombiner &Combiner,
   }
   Combiner.ExtendSetCCUses(SetCCs, N0, Res, ExtOpc);
   // If the load value is used only by N, replace it via CombineTo N.
+  unsigned Opcode_N = N->getOpcode();
+  bool IsSigned = Opcode_N == ISD::SIGN_EXTEND;
   SDValue OldLoadVal(Load, 0);
   SDValue OldExtValue(N, 0);
   bool NoReplaceTrunc = N0.hasOneUse();
