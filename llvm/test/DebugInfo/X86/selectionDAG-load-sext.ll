@@ -8,11 +8,11 @@
 ; MIR: ![[IDX2:[0-9]+]] = !DILocalVariable(name: "Idx2"
 ; MIR-LABEL: bb.0
 ; MIR: %{{[0-9a-f]+}}{{.*}} = MOVSX64rm32 ${{.*}}, 1, $noreg, @GlobArr, $noreg, debug-instr-number [[INSTR_NUM:[0-9]+]]
-; MIR-NEXT: DBG_INSTR_REF ![[IDX]], !DIExpression(DW_OP_LLVM_arg, 0,  DW_OP_LLVM_convert, 32, DW_ATE_signed, DW_OP_LLVM_convert, 64, DW_ATE_signed, DW_OP_stack_value), dbg-instr-ref([[INSTR_NUM]], 0)
+; MIR-NEXT: DBG_INSTR_REF ![[IDX]], !DIExpression(DW_OP_LLVM_arg, 0,  DW_OP_LLVM_convert, 64, DW_ATE_signed, DW_OP_LLVM_convert, 32, DW_ATE_signed, DW_OP_stack_value), dbg-instr-ref([[INSTR_NUM]], 0)
 ; MIR-NEXT: DBG_INSTR_REF ![[IDX2]], !DIExpression(DW_OP_LLVM_arg, 0), dbg-instr-ref([[INSTR_NUM]], 0)
 
 ; DUMP: DW_AT_location	(indexed ({{[0-9a-f]+}}x{{[0-9a-f]+}}) loclist = 0x{{[0-9a-f]+}}: 
-; DUMP-NEXT: [0x{{[0-9a-f]+}}, 0x{{[0-9a-f]+}}): DW_OP_breg0 RAX+0, DW_OP_convert (0x{{[0-9a-f]+}}) "DW_ATE_signed_32", DW_OP_convert (0x{{[0-9a-f]+}}) "DW_ATE_signed_64", DW_OP_stack_value)
+; DUMP-NEXT: [0x{{[0-9a-f]+}}, 0x{{[0-9a-f]+}}): DW_OP_breg0 RAX+0, DW_OP_convert (0x{{[0-9a-f]+}}) "DW_ATE_signed_64", DW_OP_convert (0x{{[0-9a-f]+}}) "DW_ATE_signed_32", DW_OP_stack_value)
 
 ; DUMP2: DW_AT_location	(indexed ({{[0-9a-f]+}}x{{[0-9a-f]+}}) loclist = 0x{{[0-9a-f]+}}: 
 ; DUMP2-NEXT: [0x{{[0-9a-f]+}}, 0x{{[0-9a-f]+}}): DW_OP_reg0 RAX)

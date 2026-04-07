@@ -5,7 +5,7 @@
 ; MIR: ![[V:[0-9]+]] = !DILocalVariable(name: "v"
 ; MIR-LABEL: bb.0
 ; MIR: %{{[0-9a-f]+}}{{.*}} = MOVZX32rm8 {{.*}}, 1, $noreg, 0, $noreg, debug-instr-number [[INSTR_NUM:[0-9]+]]
-; MIR-NEXT: DBG_INSTR_REF ![[V]], !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_convert, 8, DW_ATE_unsigned, DW_OP_LLVM_convert, 32, DW_ATE_unsigned, DW_OP_constu, 45, DW_OP_eq, DW_OP_LLVM_arg, 1, DW_OP_LLVM_convert, 8, DW_ATE_unsigned, DW_OP_LLVM_convert, 32, DW_ATE_unsigned, DW_OP_constu, 114, DW_OP_eq, DW_OP_or, DW_OP_stack_value), dbg-instr-ref([[INSTR_NUM]], 0), dbg-instr-ref([[INSTR_NUM]], 0)
+; MIR-NEXT: DBG_INSTR_REF ![[V]], !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_convert, 32, DW_ATE_unsigned, DW_OP_LLVM_convert, 8, DW_ATE_unsigned, DW_OP_constu, 45, DW_OP_eq, DW_OP_LLVM_arg, 1, DW_OP_LLVM_convert, 32, DW_ATE_unsigned, DW_OP_LLVM_convert, 8, DW_ATE_unsigned, DW_OP_constu, 114, DW_OP_eq, DW_OP_or, DW_OP_stack_value), dbg-instr-ref([[INSTR_NUM]], 0), dbg-instr-ref([[INSTR_NUM]], 0)
 
   @.str = private unnamed_addr constant [105 x i8] c"/Users/srastogi/Development/llvm-project-2/compiler-rt/lib/sanitizer_common/sanitizer_procmaps_linux.cpp\00"
   @.str.1 = private unnamed_addr constant [45 x i8] c"((IsOneOf(*data_.current, '-', 'r'))) != (0)\00"

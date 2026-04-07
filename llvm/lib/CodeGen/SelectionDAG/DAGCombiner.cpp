@@ -14893,8 +14893,8 @@ static SDValue tryToFoldExtOfLoad(SelectionDAG &DAG, DAGCombiner &Combiner,
 
   SDLoc DL(Load);
 
-  auto SalvageDbgValue = [&](SDDbgValue *Dbg, SDValue From, SDValue To,
-                             unsigned FromBits, unsigned ToBits,
+  auto SalvageDbgValue = [&](SDDbgValue *Dbg, SDValue Old, SDValue New,
+                             unsigned OldBits, unsigned NewBits,
                              bool IsSigned) {
     SmallVector<SDDbgOperand> Locs = Dbg->copyLocationOps();
     bool Changed = false;
@@ -14907,9 +14907,8 @@ static SDValue tryToFoldExtOfLoad(SelectionDAG &DAG, DAGCombiner &Combiner,
       if (Op.getKind() != SDDbgOperand::SDNODE)
         continue;
 
-      if (Op.getSDNode() == From.getNode() &&
-          Op.getResNo() == From.getResNo()) {
-        Op = SDDbgOperand::fromNode(To.getNode(), To.getResNo());
+      if (Op.getSDNode() == Old.getNode() && Op.getResNo() == Old.getResNo()) {
+        Op = SDDbgOperand::fromNode(New.getNode(), New.getResNo());
         Changed = true;
 
         if (IsVariadic)
@@ -14926,9 +14925,9 @@ static SDValue tryToFoldExtOfLoad(SelectionDAG &DAG, DAGCombiner &Combiner,
     if (!IsVariadic) {
       // Do not introduce DW_OP_LLVM_arg into ordinary single-location
       // DBG_VALUEs.
-      NewExpr = DIExpression::appendExt(OldExpr, FromBits, ToBits, IsSigned);
+      NewExpr = DIExpression::appendExt(OldExpr, NewBits, OldBits, IsSigned);
     } else {
-      auto ExtOps = DIExpression::getExtOps(FromBits, ToBits, IsSigned);
+      auto ExtOps = DIExpression::getExtOps(NewBits, OldBits, IsSigned);
 
       NewExpr = DIExpression::convertToVariadicExpression(OldExpr);
 
@@ -14951,19 +14950,19 @@ static SDValue tryToFoldExtOfLoad(SelectionDAG &DAG, DAGCombiner &Combiner,
   // instruction, the dbg_value attached to the load will be of a smaller bit
   // width, and we have to add a DW_OP_LLVM_convert expression to get the
   // correct size.
-  auto SalvageToOldLoadSize = [&](SDValue From, SDValue To, bool IsSigned) {
+  auto SalvageToOldLoadSize = [&](SDValue Old, SDValue New, bool IsSigned) {
     SmallVector<SDDbgValue *, 4> DbgVals(
-        DAG.GetDbgValues(From.getNode()).begin(),
-        DAG.GetDbgValues(From.getNode()).end());
+        DAG.GetDbgValues(Old.getNode()).begin(),
+        DAG.GetDbgValues(Old.getNode()).end());
 
-    unsigned VarBitsFrom = From.getValueSizeInBits();
-    unsigned VarBitsTo = To.getValueSizeInBits();
+    unsigned VarBitsOld = Old.getValueSizeInBits();
+    unsigned VarBitsNew = New.getValueSizeInBits();
 
     for (SDDbgValue *Dbg : DbgVals) {
       if (Dbg->isInvalidated())
         continue;
 
-      SalvageDbgValue(Dbg, From, To, VarBitsFrom, VarBitsTo, IsSigned);
+      SalvageDbgValue(Dbg, Old, New, VarBitsOld, VarBitsNew, IsSigned);
     }
   };
 
